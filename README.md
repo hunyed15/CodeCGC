@@ -52,12 +52,34 @@ cgc-install --mode user
 - `~/.claude/hooks/route-edit.ps1`
 - `~/.claude/commands/cgc*.md` 自定义 slash commands
 
+当前安装链路还会注册 3 个 MCP server：
+
+- `codecgc`：CodeCGC 编排器 MCP
+- `codex`：后端执行器 MCP
+- `gemini`：前端执行器 MCP
+
 安装完成后，可以在 Claude 中直接使用：
 
 - `/cgc`
 - `/cgc-install`
 - `/cgc-status`
 - `/cgc-doctor`
+- `/cgc-plan`
+- `/cgc-build`
+- `/cgc-fix`
+- `/cgc-test`
+- `/cgc-review`
+- `/cgc-route`
+- `/cgc-history`
+- `/cgc-package-audit`
+- `/cgc-external-audit`
+- `/cgc-release-readiness`
+- `/cgc-lifecycle`
+
+当前这些 Claude commands 已调整为：
+
+- 优先走 `codecgc` MCP orchestrator
+- 只有在 MCP tool 路径不可用时，才回退到本地 CLI
 
 如果安装时 Python 尚未就绪，自动集成会跳过，此时可在安装 Python 后手动执行 `cgc-install --mode user`。
 

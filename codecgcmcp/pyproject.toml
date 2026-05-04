@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codecgcmcp"
+version = "0.1.0"
+description = "FastMCP orchestrator server for CodeCGC."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp[cli]>=1.21.2",
+]
+
+[project.scripts]
+codecgcmcp = "codecgcmcp.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codecgcmcp"]

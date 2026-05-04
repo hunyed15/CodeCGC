@@ -28,6 +28,7 @@ def run_json_script(script_name: str, *args: str) -> dict[str, Any]:
     completed = subprocess.run(
         command,
         cwd=PROJECT_WORKSPACE,
+        stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
         encoding="utf-8",

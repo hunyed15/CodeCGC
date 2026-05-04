@@ -16,6 +16,7 @@ codexmcp/docs/
 codexmcp/images/
 codexmcp/uv.lock
 geminimcp/.venv/
+codecgcmcp/.venv/
 geminimcp/docs/
 geminimcp/images/
 geminimcp/uv.lock

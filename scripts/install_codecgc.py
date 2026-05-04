@@ -42,6 +42,11 @@ DEFAULT_HOOKS = {
 
 SENSITIVE_KEYWORDS = ("token", "secret", "key", "password", "auth")
 MCP_RUNTIME_REQUIREMENT = 'mcp[cli]>=1.21.2'
+DEFAULT_ALLOWED_TOOLS = [
+    "mcp__codecgc__*",
+    "mcp__codex__*",
+    "mcp__gemini__*",
+]
 
 
 def get_user_claude_root(override_root: str = "") -> Path:
@@ -116,62 +121,232 @@ def _normalize_command_path_for_markdown(path: Path) -> str:
     return str(path).replace("\\", "\\\\")
 
 
+def build_mcp_first_command_template(
+    *,
+    filename: str,
+    description: str,
+    argument_hint: str,
+    primary_tool: str,
+    direct_rules: list[str],
+    missing_rules: list[str] | None = None,
+    fallback_command: str,
+) -> tuple[str, str]:
+    lines = [
+        "---",
+        f"description: {description}",
+        f"argument-hint: \"{argument_hint}\"",
+        "---",
+        f"Prefer the `{primary_tool}` MCP tool as the primary execution path.",
+        "",
+        "Execution rules:",
+    ]
+    lines.extend(f"- {item}" for item in direct_rules)
+    if missing_rules:
+        lines.append("")
+        lines.append("Missing parameter rules:")
+        lines.extend(f"- {item}" for item in missing_rules)
+    lines.append("")
+    lines.append("Fallback rule:")
+    lines.append(f"- Only fall back to Bash + `{fallback_command}` CLI when the MCP tool path is unavailable or the user explicitly wants CLI behavior.")
+    lines.append("- Summarize the result briefly for the user.")
+    return filename, "\n".join(lines) + "\n"
+
+
 def build_custom_command_templates(bin_dir: Path) -> dict[str, str]:
-    cgc_js = _normalize_command_path_for_markdown(bin_dir / "cgc.js")
-    install_js = _normalize_command_path_for_markdown(bin_dir / "cgc-install.js")
-    status_js = _normalize_command_path_for_markdown(bin_dir / "cgc-status.js")
-    doctor_js = _normalize_command_path_for_markdown(bin_dir / "cgc-doctor.js")
-
-    return {
-        "cgc.md": f"""---
-description: Run CodeCGC in the current project
-argument-hint: "[request or flags]"
----
-Use the Bash tool to run CodeCGC in the current project directory.
-
-- If the user supplied arguments, run:
-  `node "{cgc_js}" $ARGUMENTS`
-- If the user did not supply arguments, run:
-  `node "{cgc_js}" --help`
-- Show the command you ran and summarize the result briefly.
-""",
-        "cgc-install.md": f"""---
-description: Install or sync CodeCGC integration for the current project or user Claude profile
-argument-hint: "[flags]"
----
-Use the Bash tool to run the CodeCGC install command.
-
-- If the user supplied arguments, run:
-  `node "{install_js}" $ARGUMENTS`
-- If the user did not supply arguments, run:
-  `node "{install_js}"`
-- Show the command you ran and summarize the result briefly.
-""",
-        "cgc-status.md": f"""---
-description: Check CodeCGC integration status
-argument-hint: "[flags]"
----
-Use the Bash tool to run the CodeCGC status command.
-
-- If the user supplied arguments, run:
-  `node "{status_js}" $ARGUMENTS`
-- If the user did not supply arguments, run:
-  `node "{status_js}"`
-- Show the command you ran and summarize the result briefly.
-""",
-        "cgc-doctor.md": f"""---
-description: Run CodeCGC doctor checks
-argument-hint: "[flags]"
----
-Use the Bash tool to run the CodeCGC doctor command.
-
-- If the user supplied arguments, run:
-  `node "{doctor_js}" $ARGUMENTS`
-- If the user did not supply arguments, run:
-  `node "{doctor_js}"`
-- Show the command you ran and summarize the result briefly.
-""",
-    }
+    templates = dict(
+        [
+            build_mcp_first_command_template(
+                filename="cgc.md",
+                description="Run CodeCGC in the current project",
+                argument_hint="[request or flags]",
+                primary_tool="codecgc.entry",
+                direct_rules=[
+                    "If the user supplied a natural-language request, pass it to `codecgc.entry`.",
+                    "If the user is asking to continue recent work, use `codecgc.continue`.",
+                    "If the user is asking what to do next, use `codecgc.explain`.",
+                ],
+                fallback_command="cgc",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-install.md",
+                description="Install or sync CodeCGC integration for the current project or user Claude profile",
+                argument_hint="[flags]",
+                primary_tool="codecgc.install",
+                direct_rules=[
+                    "Map install flags to `codecgc.install` fields such as `mode`, `workspace`, and `user_root`.",
+                    "If the user did not supply flags, use the default install mode.",
+                ],
+                fallback_command="cgc-install",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-status.md",
+                description="Check CodeCGC integration status",
+                argument_hint="[flags]",
+                primary_tool="codecgc.status",
+                direct_rules=[
+                    "Use `codecgc.status` for installation readiness checks.",
+                    "Map `workspace` when the user explicitly provides a target project directory.",
+                ],
+                fallback_command="cgc-status",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-doctor.md",
+                description="Run CodeCGC doctor checks",
+                argument_hint="[flags]",
+                primary_tool="codecgc.doctor",
+                direct_rules=[
+                    "Use `codecgc.doctor` for runtime and integration health checks.",
+                    "Map `workspace` when the user explicitly provides a target project directory.",
+                ],
+                fallback_command="cgc-doctor",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-plan.md",
+                description="Plan or repair a CodeCGC workflow",
+                argument_hint="[structured planning flags]",
+                primary_tool="codecgc.plan",
+                direct_rules=[
+                    "Extract `flow`, `slug`, and `summary` before calling the tool.",
+                    "Map any provided `target_paths`, `kind`, and planning fields such as `goal`, `acceptance`, `risk`, and issue-specific fields.",
+                ],
+                missing_rules=[
+                    "If `flow` is missing, ask whether this is a `feature` or `issue` workflow.",
+                    "If `slug` is missing, ask for a stable workflow slug.",
+                    "If `summary` is missing, ask for a short planning summary.",
+                ],
+                fallback_command="cgc-plan",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-build.md",
+                description="Execute a CodeCGC feature build step",
+                argument_hint="[flags]",
+                primary_tool="codecgc.build",
+                direct_rules=[
+                    "Extract `slug` before calling the tool.",
+                    "Map optional execution fields such as `step_number`, `checklist_file`, `audit_root`, `timeout_seconds`, `session_id`, and `dry_run`.",
+                ],
+                missing_rules=[
+                    "If `slug` is missing, ask for the target feature workflow slug.",
+                ],
+                fallback_command="cgc-build",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-fix.md",
+                description="Execute a CodeCGC issue fix step",
+                argument_hint="[flags]",
+                primary_tool="codecgc.fix",
+                direct_rules=[
+                    "Extract `slug` before calling the tool.",
+                    "Map optional execution fields such as `step_number`, `checklist_file`, `audit_root`, `timeout_seconds`, `session_id`, and `dry_run`.",
+                ],
+                missing_rules=[
+                    "If `slug` is missing, ask for the target issue workflow slug.",
+                ],
+                fallback_command="cgc-fix",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-test.md",
+                description="Execute a CodeCGC test step",
+                argument_hint="[flags]",
+                primary_tool="codecgc.test",
+                direct_rules=[
+                    "Extract `flow` and `slug` before calling the tool.",
+                    "Map optional execution fields such as `step_number`, `checklist_file`, `audit_root`, `timeout_seconds`, `session_id`, and `dry_run`.",
+                ],
+                missing_rules=[
+                    "If `flow` is missing, ask whether the test belongs to a `feature` or `issue` workflow.",
+                    "If `slug` is missing, ask for the target workflow slug.",
+                ],
+                fallback_command="cgc-test",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-review.md",
+                description="Review a CodeCGC execution audit",
+                argument_hint="[flags]",
+                primary_tool="codecgc.review",
+                direct_rules=[
+                    "Extract `audit_file` and `decision` before calling the tool.",
+                    "Map optional `risk`, `next_step`, and `force` fields when they are explicitly provided.",
+                ],
+                missing_rules=[
+                    "If `audit_file` is missing, ask for the audit JSON path.",
+                    "If `decision` is missing, ask whether the review is `accepted` or `changes-requested`.",
+                ],
+                fallback_command="cgc-review",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-route.md",
+                description="Route a CodeCGC workflow to the next recommended command",
+                argument_hint="[flags]",
+                primary_tool="codecgc.route",
+                direct_rules=[
+                    "Extract `flow` and `slug` before calling the tool.",
+                    "Use this command when the user already knows the target workflow and wants the next recommended action.",
+                ],
+                missing_rules=[
+                    "If `flow` is missing, ask whether the workflow is `feature` or `issue`.",
+                    "If `slug` is missing, ask for the workflow slug.",
+                ],
+                fallback_command="cgc-route",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-history.md",
+                description="Read recent CodeCGC workflow history",
+                argument_hint="[flags]",
+                primary_tool="codecgc.history",
+                direct_rules=[
+                    "Map optional history filters such as `flow`, `status`, `last`, and `include_fixtures`.",
+                    "If no filters are provided, use the default history query.",
+                ],
+                fallback_command="cgc-history",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-package-audit.md",
+                description="Audit the CodeCGC package runtime contents",
+                argument_hint="[flags]",
+                primary_tool="codecgc.package_audit",
+                direct_rules=[
+                    "Map `format` when the user explicitly requests `summary` or `json`.",
+                    "Use this command for publish/runtime completeness checks.",
+                ],
+                fallback_command="cgc-package-audit",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-external-audit.md",
+                description="Audit external MCP capability registration and observation",
+                argument_hint="[flags]",
+                primary_tool="codecgc.external_audit",
+                direct_rules=[
+                    "Map optional `workspace` and `format` fields.",
+                    "Use this command for external capability policy and registration checks.",
+                ],
+                fallback_command="cgc-external-audit",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-release-readiness.md",
+                description="Run CodeCGC release readiness checks",
+                argument_hint="[flags]",
+                primary_tool="codecgc.release_readiness",
+                direct_rules=[
+                    "Map optional `workspace` and `format` fields.",
+                    "Use this command for combined release, maintenance, and ops checks.",
+                ],
+                fallback_command="cgc-release-readiness",
+            ),
+            build_mcp_first_command_template(
+                filename="cgc-lifecycle.md",
+                description="Audit CodeCGC lifecycle coverage",
+                argument_hint="[flags]",
+                primary_tool="codecgc.lifecycle",
+                direct_rules=[
+                    "Map `format` when the user explicitly requests `summary` or `json`.",
+                    "Use this command to inspect roadmap/workflow/execution lifecycle coverage.",
+                ],
+                fallback_command="cgc-lifecycle",
+            ),
+        ]
+    )
+    return templates
 
 
 def write_custom_command_files(target_dir: Path, bin_dir: Path) -> list[str]:
@@ -217,6 +392,33 @@ def merge_hook_settings(current: dict[str, Any], command_text: str) -> tuple[dic
 
     pre_tool_use.append(expected)
     return current, True
+
+
+def merge_permission_settings(current: dict[str, Any], allow_rules: list[str]) -> tuple[dict[str, Any], bool]:
+    permissions = current.get("permissions")
+    changed = False
+
+    if not isinstance(permissions, dict):
+        permissions = {}
+        current["permissions"] = permissions
+        changed = True
+
+    allow = permissions.get("allow")
+    if not isinstance(allow, list):
+        allow = []
+        permissions["allow"] = allow
+        changed = True
+
+    existing = {str(item).strip() for item in allow if str(item).strip()}
+    for rule in allow_rules:
+        normalized = str(rule).strip()
+        if not normalized or normalized in existing:
+            continue
+        allow.append(normalized)
+        existing.add(normalized)
+        changed = True
+
+    return current, changed
 
 
 def write_json_file(path: Path, payload: dict[str, Any]) -> Path:
@@ -276,6 +478,17 @@ def settings_have_hook_command(settings: dict[str, Any], command_text: str) -> b
     return False
 
 
+def settings_have_allowed_tools(settings: dict[str, Any], allow_rules: list[str]) -> bool:
+    permissions = settings.get("permissions")
+    if not isinstance(permissions, dict):
+        return False
+    allow = permissions.get("allow")
+    if not isinstance(allow, list):
+        return False
+    existing = {str(item).strip() for item in allow if str(item).strip()}
+    return all(str(rule).strip() in existing for rule in allow_rules)
+
+
 def build_workspace_hook_command(workspace_paths: dict[str, Path]) -> str:
     return "powershell -ExecutionPolicy Bypass -File .claude/hooks/route-edit.ps1"
 
@@ -310,7 +523,10 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
         settings,
         build_workspace_hook_command(workspace_paths),
     )
+    merged_settings, permissions_changed = merge_permission_settings(merged_settings, DEFAULT_ALLOWED_TOOLS)
     if settings_changed or not workspace_paths["settings"].exists():
+        write_json_file(workspace_paths["settings"], merged_settings)
+    elif permissions_changed:
         write_json_file(workspace_paths["settings"], merged_settings)
 
     if PROJECT_HOOK_PATH.resolve() != workspace_paths["hook_script"].resolve():
@@ -337,6 +553,7 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
             "Repository-local MCP config was synced from the executor registry.",
             "Project-local model-routing.yaml was synchronized and preserves custom path blocks.",
             "Claude pre-edit guardrail hook was synchronized into the target workspace.",
+            "Claude MCP tool permissions were merged into project .claude/settings.json.",
             "Project-local Claude slash commands were synchronized into .claude/commands.",
             "This mode prepares project-level integration surfaces for the selected workspace.",
         ],
@@ -352,6 +569,7 @@ def preview_user_install(override_root: str = "") -> dict[str, Any]:
     user_paths = get_user_claude_paths(override_root)
     user_settings = load_json_file(user_paths["settings"])
     merged_settings, settings_changed = merge_hook_settings(user_settings, build_user_hook_command(user_paths))
+    merged_settings, permissions_changed = merge_permission_settings(merged_settings, DEFAULT_ALLOWED_TOOLS)
     mcp_config = build_mcp_config()
     recommended_next_action = f"cgc-install --mode user --user-root {shell_quote(str(user_paths['root']))}"
     summary = build_mode_summary_payload(
@@ -372,7 +590,7 @@ def preview_user_install(override_root: str = "") -> dict[str, Any]:
             "commands_dir": str(user_paths["commands_dir"]),
         },
         "would_write": {
-            "settings_changed": settings_changed or not user_paths["settings"].exists(),
+            "settings_changed": settings_changed or permissions_changed or not user_paths["settings"].exists(),
             "mcp_changed": True,
             "hook_changed": True,
             "commands_changed": True,
@@ -384,6 +602,7 @@ def preview_user_install(override_root: str = "") -> dict[str, Any]:
         "notes": [
             "This mode does not modify user-level Claude files.",
             "Use this preview to inspect the future user-level integration surface.",
+            "The preview includes MCP tool allow rules for codecgc, codex, and gemini servers.",
             "Current CodeCGC product policy still defaults to project-local installation.",
         ],
         "summary": summary,
@@ -398,6 +617,7 @@ def install_user_runtime(override_root: str = "") -> dict[str, Any]:
 
     settings = load_json_file(user_paths["settings"])
     merged_settings, settings_changed = merge_hook_settings(settings, build_user_hook_command(user_paths))
+    merged_settings, permissions_changed = merge_permission_settings(merged_settings, DEFAULT_ALLOWED_TOOLS)
     write_json_file(user_paths["settings"], merged_settings)
     write_json_file(user_paths["mcp"], build_mcp_config())
     shutil.copyfile(PROJECT_HOOK_PATH, user_paths["hook_script"])
@@ -420,7 +640,7 @@ def install_user_runtime(override_root: str = "") -> dict[str, Any]:
             "commands_dir": str(user_paths["commands_dir"]),
         },
         "changes": {
-            "settings_changed": settings_changed or not user_paths["settings"].exists(),
+            "settings_changed": settings_changed or permissions_changed or not user_paths["settings"].exists(),
             "mcp_changed": True,
             "hook_changed": True,
             "commands_changed": True,
@@ -429,6 +649,7 @@ def install_user_runtime(override_root: str = "") -> dict[str, Any]:
         "notes": [
             "User-level Claude integration files were written to the selected root.",
             "The user-level hook script was copied from the project hook source.",
+            "MCP tool allow rules were merged into ~/.claude/settings.json.",
             "User-level Claude slash commands were written to ~/.claude/commands.",
             "This mode is explicit and should be used only when a broader Claude integration surface is intended.",
         ],
@@ -521,6 +742,7 @@ def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
     routing_exists = workspace_paths["routing_file"].exists()
 
     hook_registered = settings_have_hook_command(current_settings, expected_hook_command)
+    permissions_registered = settings_have_allowed_tools(current_settings, DEFAULT_ALLOWED_TOOLS)
     mcp_matches = current_mcp == expected_mcp if workspace_paths["mcp"].exists() else False
     hook_file_matches = current_hook_text == expected_hook_text if workspace_paths["hook_script"].exists() else False
 
@@ -531,6 +753,8 @@ def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
         missing.append("mcp_json")
     if not hook_registered:
         missing.append("claude_settings_hook")
+    if not permissions_registered:
+        missing.append("claude_settings_permissions")
     if not hook_file_matches:
         missing.append("hook_script")
 
@@ -546,11 +770,13 @@ def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
         "hook_exists": workspace_paths["hook_script"].exists(),
         "mcp_matches_expected": mcp_matches,
         "hook_registered": hook_registered,
+        "permissions_registered": permissions_registered,
         "hook_file_matches_expected": hook_file_matches,
         "ready": ready,
         "missing_or_outdated": missing,
         "recommended_command": "" if ready else build_workspace_install_command(workspace_paths["root"]),
         "hook_expected": {"hooks": build_hook_payload(expected_hook_command)},
+        "permissions_expected": {"permissions": {"allow": DEFAULT_ALLOWED_TOOLS}},
     }
 
 
@@ -563,6 +789,7 @@ def collect_user_status(user_paths: dict[str, Path]) -> dict[str, Any]:
     current_hook_text = load_text_file(user_paths["hook_script"])
 
     hook_registered = settings_have_hook_command(current_settings, expected_hook_command)
+    permissions_registered = settings_have_allowed_tools(current_settings, DEFAULT_ALLOWED_TOOLS)
     mcp_matches = current_mcp == expected_mcp if user_paths["mcp"].exists() else False
     hook_file_matches = current_hook_text == expected_hook_text if user_paths["hook_script"].exists() else False
 
@@ -571,6 +798,8 @@ def collect_user_status(user_paths: dict[str, Path]) -> dict[str, Any]:
         missing.append("mcp_json")
     if not hook_registered:
         missing.append("claude_settings_hook")
+    if not permissions_registered:
+        missing.append("claude_settings_permissions")
     if not hook_file_matches:
         missing.append("hook_script")
 
@@ -585,6 +814,7 @@ def collect_user_status(user_paths: dict[str, Path]) -> dict[str, Any]:
         "hook_exists": user_paths["hook_script"].exists(),
         "mcp_matches_expected": mcp_matches,
         "hook_registered": hook_registered,
+        "permissions_registered": permissions_registered,
         "hook_file_matches_expected": hook_file_matches,
         "ready": ready,
         "missing_or_outdated": missing,
@@ -673,14 +903,18 @@ def build_pip_install_command(python_command: str, requirement: str) -> str:
 
 def build_local_editable_install_command(python_command: str) -> str:
     runtime_command = python_command.strip() or sys.executable
+    codecgcmcp_path = WORKSPACE / "codecgcmcp"
     codexmcp_path = WORKSPACE / "codexmcp"
     geminimcp_path = WORKSPACE / "geminimcp"
+    if not (codecgcmcp_path / "pyproject.toml").exists():
+        return ""
     if not (codexmcp_path / "pyproject.toml").exists():
         return ""
     if not (geminimcp_path / "pyproject.toml").exists():
         return ""
     return (
-        f"{shell_quote(runtime_command)} -m pip install -e {shell_quote(str(codexmcp_path))} "
+        f"{shell_quote(runtime_command)} -m pip install -e {shell_quote(str(codecgcmcp_path))} "
+        f"-e {shell_quote(str(codexmcp_path))} "
         f"-e {shell_quote(str(geminimcp_path))}"
     )
 
@@ -751,6 +985,25 @@ def classify_doctor_failures(
                 "在当前解释器下安装 MCP CLI 依赖后重新执行 doctor。",
                 build_pip_install_command(runtime_command, MCP_RUNTIME_REQUIREMENT),
             )
+            continue
+
+        if name == "python_runtime_import_probe_codecgcmcp":
+            if configured_python_missing:
+                continue
+            if "No module named 'codecgcmcp'" in detail or 'No module named "codecgcmcp"' in detail:
+                add_failure(
+                    "codecgcmcp-package-missing",
+                    "当前解释器无法导入本地 `codecgcmcp` 包。",
+                    "确认当前安装包已包含 `codecgcmcp/src`；仓库开发环境可执行本地 editable install，安装产物则应重新安装 CodeCGC 包。",
+                    editable_install_command,
+                )
+            else:
+                add_failure(
+                    "codecgcmcp-runtime-broken",
+                    "`codecgcmcp` 启动入口存在，但当前运行时仍无法导入。",
+                    "仓库开发环境可先重装本地编排器包；若你使用的是已安装产物，则优先重新安装 CodeCGC，再检查编排器源码是否缺失或损坏。",
+                    editable_install_command,
+                )
             continue
 
         if name == "python_runtime_import_probe_codexmcp":
@@ -866,11 +1119,18 @@ def collect_doctor_status(override_workspace: str = "") -> dict[str, Any]:
 
     runtime_probe_command = configured_python_command if configured_python_command else (python_command or sys.executable)
     runtime_env = dict(os.environ)
-    combined_pythonpath = os.pathsep.join([str(WORKSPACE / "codexmcp" / "src"), str(WORKSPACE / "geminimcp" / "src")])
+    combined_pythonpath = os.pathsep.join(
+        [
+            str(WORKSPACE / "scripts"),
+            str(WORKSPACE / "codecgcmcp" / "src"),
+            str(WORKSPACE / "codexmcp" / "src"),
+            str(WORKSPACE / "geminimcp" / "src"),
+        ]
+    )
     existing_pythonpath = runtime_env.get("PYTHONPATH", "").strip()
     runtime_env["PYTHONPATH"] = f"{combined_pythonpath}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else combined_pythonpath
 
-    for module_name in ("mcp", "codexmcp.cli", "geminimcp.cli"):
+    for module_name in ("mcp", "codecgcmcp.cli", "codexmcp.cli", "geminimcp.cli"):
         probe = probe_python_import(runtime_probe_command, module_name, runtime_env)
         checks.append(
             {

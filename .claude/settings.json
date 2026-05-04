@@ -11,5 +11,12 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "mcp__codecgc__*",
+      "mcp__codex__*",
+      "mcp__gemini__*"
+    ]
   }
 }

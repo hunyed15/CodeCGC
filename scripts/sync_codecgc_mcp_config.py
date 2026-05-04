@@ -1,3 +1,4 @@
+import os
 import json
 from pathlib import Path
 
@@ -8,16 +9,32 @@ WORKSPACE = Path(__file__).resolve().parents[1]
 MCP_CONFIG_PATH = WORKSPACE / ".mcp.json"
 
 
+def build_runtime_pythonpath(*extra_paths: Path) -> str:
+    paths = [str(WORKSPACE / "scripts"), *(str(path) for path in extra_paths)]
+    return os.pathsep.join(paths)
+
+
 def build_mcp_config() -> dict:
     registry = build_executor_registry()
     servers: dict[str, dict] = {}
+
+    servers["codecgc"] = {
+        "command": str(next(iter(registry.values()))["python_command"]),
+        "args": ["-m", "codecgcmcp.cli"],
+        "env": {
+            "PYTHONPATH": build_runtime_pythonpath(WORKSPACE / "codecgcmcp" / "src"),
+        },
+    }
 
     for config in registry.values():
         servers[str(config["mcp_server_name"])] = {
             "command": str(config["python_command"]),
             "args": ["-m", str(config["python_module"])],
             "env": {
-                "PYTHONPATH": str(config["pythonpath"]),
+                "PYTHONPATH": build_runtime_pythonpath(
+                    WORKSPACE / "codecgcmcp" / "src",
+                    Path(str(config["pythonpath"])),
+                ),
             },
         }
 

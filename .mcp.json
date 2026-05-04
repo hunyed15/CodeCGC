@@ -1,5 +1,15 @@
 {
   "mcpServers": {
+    "codecgc": {
+      "command": "C:\\Python314\\python.exe",
+      "args": [
+        "-m",
+        "codecgcmcp.cli"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\Software\\VibeCoding\\CodeCGC\\release\\scripts;D:\\Software\\VibeCoding\\CodeCGC\\release\\codecgcmcp\\src"
+      }
+    },
     "codex": {
       "command": "C:\\Python314\\python.exe",
       "args": [
@@ -7,7 +17,7 @@
         "codexmcp.cli"
       ],
       "env": {
-        "PYTHONPATH": "D:\\Software\\VibeCoding\\CodeCGC\\codexmcp\\src"
+        "PYTHONPATH": "D:\\Software\\VibeCoding\\CodeCGC\\release\\scripts;D:\\Software\\VibeCoding\\CodeCGC\\release\\codecgcmcp\\src;D:\\Software\\VibeCoding\\CodeCGC\\release\\codexmcp\\src"
       }
     },
     "gemini": {
@@ -17,7 +27,7 @@
         "geminimcp.cli"
       ],
       "env": {
-        "PYTHONPATH": "D:\\Software\\VibeCoding\\CodeCGC\\geminimcp\\src"
+        "PYTHONPATH": "D:\\Software\\VibeCoding\\CodeCGC\\release\\scripts;D:\\Software\\VibeCoding\\CodeCGC\\release\\codecgcmcp\\src;D:\\Software\\VibeCoding\\CodeCGC\\release\\geminimcp\\src"
       }
     }
   }

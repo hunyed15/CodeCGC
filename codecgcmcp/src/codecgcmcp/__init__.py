@@ -1,0 +1,1 @@
+"""CodeCGC MCP orchestrator package."""

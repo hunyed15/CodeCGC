@@ -9,6 +9,8 @@ frontend_paths:
   - "web/**"
   - "frontend/**"
 
+custom_frontend_paths:
+
 backend_paths:
   - "apps/api/**"
   - "server/**"
@@ -16,6 +18,8 @@ backend_paths:
   - "src/services/**"
   - "src/repositories/**"
   - "backend/**"
+
+custom_backend_paths:
 
 shared_paths:
   - "packages/shared/**"
