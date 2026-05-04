@@ -1,4 +1,4 @@
-# CodeCGC Release v0.1.0
+# CodeCGC Release v0.1.1
 
 ## 📦 发布内容
 
@@ -6,7 +6,7 @@
 
 ## 📋 版本信息
 
-- **版本号**: 0.1.0
+- **版本号**: 0.1.1
 - **发布日期**: 2026-05-04
 - **Python 要求**: >= 3.10
 - **Node.js 要求**: >= 20.0.0
@@ -36,19 +36,18 @@
 ### 1. 安装
 
 ```bash
-# 进入 release 目录
-cd /path/to/codecgc/release
-
-# 安装 CodeCGC
-npm install -g .
+# 从 npm 安装 CodeCGC
+npm install -g @hunyed15/codecgc --registry=https://registry.npmjs.org/
 
 # 安装 Python 依赖
 pip install pyyaml
 
-# 安装 MCP 服务器
-cd codexmcp && pip install -e . && cd ..
-cd geminimcp && pip install -e . && cd ..
+# 如自动集成未生效，可手动补执行
+cgc-install --mode user
 ```
+
+全局安装完成后，CodeCGC 会尝试自动写入 Claude 用户级集成到 `~/.claude`。
+如果安装时 Python 尚未就绪，自动集成会跳过，此时可在安装 Python 后手动执行 `cgc-install --mode user`。
 
 ### 2. 初始化项目
 

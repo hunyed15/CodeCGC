@@ -34,15 +34,20 @@ npm --version     # 应显示 9.x.x 或更高
 
 ## 安装 CodeCGC
 
-### 方式 1：从源码全局安装（推荐）
+### 方式 1：从 npm 全局安装（推荐）
 
 ```bash
-# 1. 解压 release 包到本地目录
-cd /path/to/codecgc/release
-
-# 2. 全局安装
-npm install -g .
+# 使用 npm 官方源安装
+npm install -g @hunyed15/codecgc --registry=https://registry.npmjs.org/
 ```
+
+安装完成后，CodeCGC 会尝试自动执行一次用户级 Claude 集成，相当于：
+
+```bash
+cgc-install --mode user
+```
+
+如果安装阶段因为 Python 未就绪而跳过了这一步，可以在装好 Python 后手动补执行该命令。
 
 安装后，以下命令将全局可用：
 - `cgc`

@@ -1,6 +1,6 @@
 {
   "name": "@hunyed15/codecgc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Claude-hosted multi-model workflow product shell for CodeCGC.",
   "license": "MIT",
   "type": "commonjs",
@@ -23,6 +23,7 @@
     "cgc-route": "bin/cgc-route.js"
   },
   "scripts": {
+    "postinstall": "node scripts/postinstall_codecgc.js",
     "cgc:help": "node bin/cgc.js --help",
     "cgc:status": "node bin/cgc-status.js --format summary",
     "cgc:doctor": "node bin/cgc-doctor.js --format summary",
@@ -39,6 +40,7 @@
   "files": [
     "bin/",
     "scripts/*.py",
+    "scripts/postinstall_codecgc.js",
     "scripts/README-codecgc-cli.md",
     ".claude/hooks/route-edit.ps1",
     "codecgc/cgc/",
