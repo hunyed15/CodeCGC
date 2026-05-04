@@ -1,18 +1,19 @@
 ---
-description: Plan or repair a CodeCGC workflow
-argument-hint: "[structured planning flags]"
+description: 规划或修复一个 CodeCGC 工作流
+argument-hint: "[结构化规划参数]"
 ---
-Prefer the `codecgc.plan` MCP tool as the primary execution path.
+优先使用 `codecgc.plan` MCP 工具作为主执行路径。
+内部思考语言可自行选择，但面向用户的最终回复默认使用中文。
 
-Execution rules:
-- Extract `flow`, `slug`, and `summary` before calling the tool.
-- Map any provided `target_paths`, `kind`, and planning fields such as `goal`, `acceptance`, `risk`, and issue-specific fields.
+执行规则：
+- 调用前提取 `flow`、`slug` 和 `summary`。
+- 映射用户提供的 `target_paths`、`kind`，以及 `goal`、`acceptance`、`risk` 等规划字段和 issue 专属字段。
 
-Missing parameter rules:
-- If `flow` is missing, ask whether this is a `feature` or `issue` workflow.
-- If `slug` is missing, ask for a stable workflow slug.
-- If `summary` is missing, ask for a short planning summary.
+缺少参数时：
+- 如果缺少 `flow`，询问这是 `feature` 还是 `issue` 工作流。
+- 如果缺少 `slug`，询问稳定的工作流 slug。
+- 如果缺少 `summary`，询问一个简短规划摘要。
 
-Fallback rule:
-- Only fall back to Bash + `cgc-plan` CLI when the MCP tool path is unavailable or the user explicitly wants CLI behavior.
-- Summarize the result briefly for the user.
+回退规则：
+- 只有在 MCP 工具路径不可用，或用户明确要求走 CLI 时，才回退到 Bash + `cgc-plan`。
+- 向用户用中文简要总结结果。

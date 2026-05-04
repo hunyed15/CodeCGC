@@ -136,19 +136,20 @@ def build_mcp_first_command_template(
         f"description: {description}",
         f"argument-hint: \"{argument_hint}\"",
         "---",
-        f"Prefer the `{primary_tool}` MCP tool as the primary execution path.",
+        f"优先使用 `{primary_tool}` MCP 工具作为主执行路径。",
+        "内部思考语言可自行选择，但面向用户的最终回复默认使用中文。",
         "",
-        "Execution rules:",
+        "执行规则：",
     ]
     lines.extend(f"- {item}" for item in direct_rules)
     if missing_rules:
         lines.append("")
-        lines.append("Missing parameter rules:")
+        lines.append("缺少参数时：")
         lines.extend(f"- {item}" for item in missing_rules)
     lines.append("")
-    lines.append("Fallback rule:")
-    lines.append(f"- Only fall back to Bash + `{fallback_command}` CLI when the MCP tool path is unavailable or the user explicitly wants CLI behavior.")
-    lines.append("- Summarize the result briefly for the user.")
+    lines.append("回退规则：")
+    lines.append(f"- 只有在 MCP 工具路径不可用，或用户明确要求走 CLI 时，才回退到 Bash + `{fallback_command}`。")
+    lines.append("- 向用户用中文简要总结结果。")
     return filename, "\n".join(lines) + "\n"
 
 
@@ -157,190 +158,190 @@ def build_custom_command_templates(bin_dir: Path) -> dict[str, str]:
         [
             build_mcp_first_command_template(
                 filename="cgc.md",
-                description="Run CodeCGC in the current project",
-                argument_hint="[request or flags]",
+                description="在当前项目中运行 CodeCGC",
+                argument_hint="[需求或参数]",
                 primary_tool="codecgc.entry",
                 direct_rules=[
-                    "If the user supplied a natural-language request, pass it to `codecgc.entry`.",
-                    "If the user is asking to continue recent work, use `codecgc.continue`.",
-                    "If the user is asking what to do next, use `codecgc.explain`.",
+                    "如果用户提供的是自然语言需求，传给 `codecgc.entry`。",
+                    "如果用户想继续最近的工作，使用 `codecgc.continue`。",
+                    "如果用户想知道下一步做什么，使用 `codecgc.explain`。",
                 ],
                 fallback_command="cgc",
             ),
             build_mcp_first_command_template(
                 filename="cgc-install.md",
-                description="Install or sync CodeCGC integration for the current project or user Claude profile",
-                argument_hint="[flags]",
+                description="为当前项目或 Claude 用户目录安装/同步 CodeCGC 集成",
+                argument_hint="[参数]",
                 primary_tool="codecgc.install",
                 direct_rules=[
-                    "Map install flags to `codecgc.install` fields such as `mode`, `workspace`, and `user_root`.",
-                    "If the user did not supply flags, use the default install mode.",
+                    "把安装参数映射到 `codecgc.install` 的 `mode`、`workspace`、`user_root` 等字段。",
+                    "如果用户没有提供参数，就使用默认安装模式。",
                 ],
                 fallback_command="cgc-install",
             ),
             build_mcp_first_command_template(
                 filename="cgc-status.md",
-                description="Check CodeCGC integration status",
-                argument_hint="[flags]",
+                description="检查 CodeCGC 集成状态",
+                argument_hint="[参数]",
                 primary_tool="codecgc.status",
                 direct_rules=[
-                    "Use `codecgc.status` for installation readiness checks.",
-                    "Map `workspace` when the user explicitly provides a target project directory.",
+                    "使用 `codecgc.status` 检查安装与集成就绪状态。",
+                    "如果用户明确给出目标项目目录，映射 `workspace`。",
                 ],
                 fallback_command="cgc-status",
             ),
             build_mcp_first_command_template(
                 filename="cgc-doctor.md",
-                description="Run CodeCGC doctor checks",
-                argument_hint="[flags]",
+                description="运行 CodeCGC 自检",
+                argument_hint="[参数]",
                 primary_tool="codecgc.doctor",
                 direct_rules=[
-                    "Use `codecgc.doctor` for runtime and integration health checks.",
-                    "Map `workspace` when the user explicitly provides a target project directory.",
+                    "使用 `codecgc.doctor` 检查运行时与集成健康状态。",
+                    "如果用户明确给出目标项目目录，映射 `workspace`。",
                 ],
                 fallback_command="cgc-doctor",
             ),
             build_mcp_first_command_template(
                 filename="cgc-plan.md",
-                description="Plan or repair a CodeCGC workflow",
-                argument_hint="[structured planning flags]",
+                description="规划或修复一个 CodeCGC 工作流",
+                argument_hint="[结构化规划参数]",
                 primary_tool="codecgc.plan",
                 direct_rules=[
-                    "Extract `flow`, `slug`, and `summary` before calling the tool.",
-                    "Map any provided `target_paths`, `kind`, and planning fields such as `goal`, `acceptance`, `risk`, and issue-specific fields.",
+                    "调用前提取 `flow`、`slug` 和 `summary`。",
+                    "映射用户提供的 `target_paths`、`kind`，以及 `goal`、`acceptance`、`risk` 等规划字段和 issue 专属字段。",
                 ],
                 missing_rules=[
-                    "If `flow` is missing, ask whether this is a `feature` or `issue` workflow.",
-                    "If `slug` is missing, ask for a stable workflow slug.",
-                    "If `summary` is missing, ask for a short planning summary.",
+                    "如果缺少 `flow`，询问这是 `feature` 还是 `issue` 工作流。",
+                    "如果缺少 `slug`，询问稳定的工作流 slug。",
+                    "如果缺少 `summary`，询问一个简短规划摘要。",
                 ],
                 fallback_command="cgc-plan",
             ),
             build_mcp_first_command_template(
                 filename="cgc-build.md",
-                description="Execute a CodeCGC feature build step",
-                argument_hint="[flags]",
+                description="执行 CodeCGC 功能开发步骤",
+                argument_hint="[参数]",
                 primary_tool="codecgc.build",
                 direct_rules=[
-                    "Extract `slug` before calling the tool.",
-                    "Map optional execution fields such as `step_number`, `checklist_file`, `audit_root`, `timeout_seconds`, `session_id`, and `dry_run`.",
+                    "调用前提取 `slug`。",
+                    "映射可选执行字段，如 `step_number`、`checklist_file`、`audit_root`、`timeout_seconds`、`session_id`、`dry_run`。",
                 ],
                 missing_rules=[
-                    "If `slug` is missing, ask for the target feature workflow slug.",
+                    "如果缺少 `slug`，询问目标功能工作流的 slug。",
                 ],
                 fallback_command="cgc-build",
             ),
             build_mcp_first_command_template(
                 filename="cgc-fix.md",
-                description="Execute a CodeCGC issue fix step",
-                argument_hint="[flags]",
+                description="执行 CodeCGC 问题修复步骤",
+                argument_hint="[参数]",
                 primary_tool="codecgc.fix",
                 direct_rules=[
-                    "Extract `slug` before calling the tool.",
-                    "Map optional execution fields such as `step_number`, `checklist_file`, `audit_root`, `timeout_seconds`, `session_id`, and `dry_run`.",
+                    "调用前提取 `slug`。",
+                    "映射可选执行字段，如 `step_number`、`checklist_file`、`audit_root`、`timeout_seconds`、`session_id`、`dry_run`。",
                 ],
                 missing_rules=[
-                    "If `slug` is missing, ask for the target issue workflow slug.",
+                    "如果缺少 `slug`，询问目标问题工作流的 slug。",
                 ],
                 fallback_command="cgc-fix",
             ),
             build_mcp_first_command_template(
                 filename="cgc-test.md",
-                description="Execute a CodeCGC test step",
-                argument_hint="[flags]",
+                description="执行 CodeCGC 测试步骤",
+                argument_hint="[参数]",
                 primary_tool="codecgc.test",
                 direct_rules=[
-                    "Extract `flow` and `slug` before calling the tool.",
-                    "Map optional execution fields such as `step_number`, `checklist_file`, `audit_root`, `timeout_seconds`, `session_id`, and `dry_run`.",
+                    "调用前提取 `flow` 和 `slug`。",
+                    "映射可选执行字段，如 `step_number`、`checklist_file`、`audit_root`、`timeout_seconds`、`session_id`、`dry_run`。",
                 ],
                 missing_rules=[
-                    "If `flow` is missing, ask whether the test belongs to a `feature` or `issue` workflow.",
-                    "If `slug` is missing, ask for the target workflow slug.",
+                    "如果缺少 `flow`，询问该测试属于 `feature` 还是 `issue` 工作流。",
+                    "如果缺少 `slug`，询问目标工作流 slug。",
                 ],
                 fallback_command="cgc-test",
             ),
             build_mcp_first_command_template(
                 filename="cgc-review.md",
-                description="Review a CodeCGC execution audit",
-                argument_hint="[flags]",
+                description="审核一份 CodeCGC 执行审计结果",
+                argument_hint="[参数]",
                 primary_tool="codecgc.review",
                 direct_rules=[
-                    "Extract `audit_file` and `decision` before calling the tool.",
-                    "Map optional `risk`, `next_step`, and `force` fields when they are explicitly provided.",
+                    "调用前提取 `audit_file` 和 `decision`。",
+                    "如果用户明确提供，映射可选字段 `risk`、`next_step`、`force`。",
                 ],
                 missing_rules=[
-                    "If `audit_file` is missing, ask for the audit JSON path.",
-                    "If `decision` is missing, ask whether the review is `accepted` or `changes-requested`.",
+                    "如果缺少 `audit_file`，询问审计 JSON 路径。",
+                    "如果缺少 `decision`，询问审核结论是 `accepted` 还是 `changes-requested`。",
                 ],
                 fallback_command="cgc-review",
             ),
             build_mcp_first_command_template(
                 filename="cgc-route.md",
-                description="Route a CodeCGC workflow to the next recommended command",
-                argument_hint="[flags]",
+                description="为 CodeCGC 工作流推荐下一条命令",
+                argument_hint="[参数]",
                 primary_tool="codecgc.route",
                 direct_rules=[
-                    "Extract `flow` and `slug` before calling the tool.",
-                    "Use this command when the user already knows the target workflow and wants the next recommended action.",
+                    "调用前提取 `flow` 和 `slug`。",
+                    "当用户已经知道目标工作流，只想得到下一步推荐动作时，使用这个命令。",
                 ],
                 missing_rules=[
-                    "If `flow` is missing, ask whether the workflow is `feature` or `issue`.",
-                    "If `slug` is missing, ask for the workflow slug.",
+                    "如果缺少 `flow`，询问工作流是 `feature` 还是 `issue`。",
+                    "如果缺少 `slug`，询问工作流 slug。",
                 ],
                 fallback_command="cgc-route",
             ),
             build_mcp_first_command_template(
                 filename="cgc-history.md",
-                description="Read recent CodeCGC workflow history",
-                argument_hint="[flags]",
+                description="查看最近的 CodeCGC 工作流历史",
+                argument_hint="[参数]",
                 primary_tool="codecgc.history",
                 direct_rules=[
-                    "Map optional history filters such as `flow`, `status`, `last`, and `include_fixtures`.",
-                    "If no filters are provided, use the default history query.",
+                    "映射可选历史筛选字段，如 `flow`、`status`、`last`、`include_fixtures`。",
+                    "如果没有提供筛选条件，就使用默认历史查询。",
                 ],
                 fallback_command="cgc-history",
             ),
             build_mcp_first_command_template(
                 filename="cgc-package-audit.md",
-                description="Audit the CodeCGC package runtime contents",
-                argument_hint="[flags]",
+                description="审计 CodeCGC 发布包运行时内容",
+                argument_hint="[参数]",
                 primary_tool="codecgc.package_audit",
                 direct_rules=[
-                    "Map `format` when the user explicitly requests `summary` or `json`.",
-                    "Use this command for publish/runtime completeness checks.",
+                    "当用户明确要求 `summary` 或 `json` 时，映射 `format`。",
+                    "该命令用于发布包和运行时完整性检查。",
                 ],
                 fallback_command="cgc-package-audit",
             ),
             build_mcp_first_command_template(
                 filename="cgc-external-audit.md",
-                description="Audit external MCP capability registration and observation",
-                argument_hint="[flags]",
+                description="审计外部 MCP 能力注册与接入状态",
+                argument_hint="[参数]",
                 primary_tool="codecgc.external_audit",
                 direct_rules=[
-                    "Map optional `workspace` and `format` fields.",
-                    "Use this command for external capability policy and registration checks.",
+                    "映射可选字段 `workspace` 和 `format`。",
+                    "该命令用于外部能力策略与注册检查。",
                 ],
                 fallback_command="cgc-external-audit",
             ),
             build_mcp_first_command_template(
                 filename="cgc-release-readiness.md",
-                description="Run CodeCGC release readiness checks",
-                argument_hint="[flags]",
+                description="运行 CodeCGC 发布就绪检查",
+                argument_hint="[参数]",
                 primary_tool="codecgc.release_readiness",
                 direct_rules=[
-                    "Map optional `workspace` and `format` fields.",
-                    "Use this command for combined release, maintenance, and ops checks.",
+                    "映射可选字段 `workspace` 和 `format`。",
+                    "该命令用于联合检查发布、维护和运维就绪状态。",
                 ],
                 fallback_command="cgc-release-readiness",
             ),
             build_mcp_first_command_template(
                 filename="cgc-lifecycle.md",
-                description="Audit CodeCGC lifecycle coverage",
-                argument_hint="[flags]",
+                description="审计 CodeCGC 生命周期覆盖情况",
+                argument_hint="[参数]",
                 primary_tool="codecgc.lifecycle",
                 direct_rules=[
-                    "Map `format` when the user explicitly requests `summary` or `json`.",
-                    "Use this command to inspect roadmap/workflow/execution lifecycle coverage.",
+                    "当用户明确要求 `summary` 或 `json` 时，映射 `format`。",
+                    "该命令用于检查 roadmap、workflow、execution 的生命周期覆盖情况。",
                 ],
                 fallback_command="cgc-lifecycle",
             ),
@@ -919,6 +920,17 @@ def build_local_editable_install_command(python_command: str) -> str:
     )
 
 
+def format_bool_zh(value: Any) -> str:
+    return "是" if bool(value) else "否"
+
+
+def format_list_zh(items: Any, empty_text: str = "无") -> str:
+    if not isinstance(items, list):
+        return empty_text
+    values = [str(item).strip() for item in items if str(item).strip()]
+    return "、".join(values) if values else empty_text
+
+
 def classify_doctor_failures(
     checks: list[dict[str, Any]],
     configured_python_command: str,
@@ -1232,12 +1244,12 @@ def main() -> int:
         lines = [
             f"- 工作区: {result.get('workspace', '')}",
             f"- 范围: {summary.get('scope', '')}",
-            f"- 项目级就绪: {'是' if summary.get('project_ready') else '否'}",
-            f"- 用户级就绪: {'是' if summary.get('user_ready') else '否'}",
+            f"- 项目级就绪: {format_bool_zh(summary.get('project_ready'))}",
+            f"- 用户级就绪: {format_bool_zh(summary.get('user_ready'))}",
             f"- 策略: {summary.get('default_policy', '')}",
             f"- 摘要: {summary.get('human_summary', '')}",
-            f"- 项目缺失项: {', '.join(project.get('missing_or_outdated', [])) or '无'}",
-            f"- 用户缺失项: {', '.join(user.get('missing_or_outdated', [])) or '无'}",
+            f"- 项目级缺失项: {format_list_zh(project.get('missing_or_outdated', []))}",
+            f"- 用户级缺失项: {format_list_zh(user.get('missing_or_outdated', []))}",
         ]
         recommended_project = str(summary.get("recommended_project_command", "")).strip()
         recommended_user = str(summary.get("recommended_user_command", "")).strip()
@@ -1252,11 +1264,11 @@ def main() -> int:
         lines = [
             f"- 工作区: {result.get('workspace', '')}",
             f"- 范围: {summary.get('scope', '')}",
-            f"- 就绪: {'是' if summary.get('ready') else '否'}",
+            f"- 就绪: {format_bool_zh(summary.get('ready'))}",
             f"- 摘要: {summary.get('human_summary', '')}",
         ]
         failed_checks = summary.get("failed_checks", [])
-        lines.append(f"- 失败检查项: {', '.join(str(item) for item in failed_checks) or '无'}")
+        lines.append(f"- 失败检查项: {format_list_zh(failed_checks)}")
         failure_categories = summary.get("failure_categories", [])
         for item in failure_categories:
             if not isinstance(item, dict):
@@ -1273,7 +1285,7 @@ def main() -> int:
         fix_command = str(summary.get("recommended_fix_command", "")).strip()
         runtime_fix_command = str(summary.get("recommended_runtime_fix_command", "")).strip()
         next_actions = [item for item in [runtime_fix_command, fix_command] if item]
-        print(render_summary_block("CodeCGC Doctor", lines, next_actions))
+        print(render_summary_block("CodeCGC 自检", lines, next_actions))
         return 0 if result.get("success") else 1
 
     if args.format == "summary" and args.mode in {"local", "user-dry-run", "user"}:

@@ -1,17 +1,18 @@
 ---
-description: Review a CodeCGC execution audit
-argument-hint: "[flags]"
+description: 审核一份 CodeCGC 执行审计结果
+argument-hint: "[参数]"
 ---
-Prefer the `codecgc.review` MCP tool as the primary execution path.
+优先使用 `codecgc.review` MCP 工具作为主执行路径。
+内部思考语言可自行选择，但面向用户的最终回复默认使用中文。
 
-Execution rules:
-- Extract `audit_file` and `decision` before calling the tool.
-- Map optional `risk`, `next_step`, and `force` fields when they are explicitly provided.
+执行规则：
+- 调用前提取 `audit_file` 和 `decision`。
+- 如果用户明确提供，映射可选字段 `risk`、`next_step`、`force`。
 
-Missing parameter rules:
-- If `audit_file` is missing, ask for the audit JSON path.
-- If `decision` is missing, ask whether the review is `accepted` or `changes-requested`.
+缺少参数时：
+- 如果缺少 `audit_file`，询问审计 JSON 路径。
+- 如果缺少 `decision`，询问审核结论是 `accepted` 还是 `changes-requested`。
 
-Fallback rule:
-- Only fall back to Bash + `cgc-review` CLI when the MCP tool path is unavailable or the user explicitly wants CLI behavior.
-- Summarize the result briefly for the user.
+回退规则：
+- 只有在 MCP 工具路径不可用，或用户明确要求走 CLI 时，才回退到 Bash + `cgc-review`。
+- 向用户用中文简要总结结果。

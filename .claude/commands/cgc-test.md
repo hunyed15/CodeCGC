@@ -1,17 +1,18 @@
 ---
-description: Execute a CodeCGC test step
-argument-hint: "[flags]"
+description: 执行 CodeCGC 测试步骤
+argument-hint: "[参数]"
 ---
-Prefer the `codecgc.test` MCP tool as the primary execution path.
+优先使用 `codecgc.test` MCP 工具作为主执行路径。
+内部思考语言可自行选择，但面向用户的最终回复默认使用中文。
 
-Execution rules:
-- Extract `flow` and `slug` before calling the tool.
-- Map optional execution fields such as `step_number`, `checklist_file`, `audit_root`, `timeout_seconds`, `session_id`, and `dry_run`.
+执行规则：
+- 调用前提取 `flow` 和 `slug`。
+- 映射可选执行字段，如 `step_number`、`checklist_file`、`audit_root`、`timeout_seconds`、`session_id`、`dry_run`。
 
-Missing parameter rules:
-- If `flow` is missing, ask whether the test belongs to a `feature` or `issue` workflow.
-- If `slug` is missing, ask for the target workflow slug.
+缺少参数时：
+- 如果缺少 `flow`，询问该测试属于 `feature` 还是 `issue` 工作流。
+- 如果缺少 `slug`，询问目标工作流 slug。
 
-Fallback rule:
-- Only fall back to Bash + `cgc-test` CLI when the MCP tool path is unavailable or the user explicitly wants CLI behavior.
-- Summarize the result briefly for the user.
+回退规则：
+- 只有在 MCP 工具路径不可用，或用户明确要求走 CLI 时，才回退到 Bash + `cgc-test`。
+- 向用户用中文简要总结结果。

@@ -1,16 +1,17 @@
 ---
-description: Execute a CodeCGC issue fix step
-argument-hint: "[flags]"
+description: 执行 CodeCGC 问题修复步骤
+argument-hint: "[参数]"
 ---
-Prefer the `codecgc.fix` MCP tool as the primary execution path.
+优先使用 `codecgc.fix` MCP 工具作为主执行路径。
+内部思考语言可自行选择，但面向用户的最终回复默认使用中文。
 
-Execution rules:
-- Extract `slug` before calling the tool.
-- Map optional execution fields such as `step_number`, `checklist_file`, `audit_root`, `timeout_seconds`, `session_id`, and `dry_run`.
+执行规则：
+- 调用前提取 `slug`。
+- 映射可选执行字段，如 `step_number`、`checklist_file`、`audit_root`、`timeout_seconds`、`session_id`、`dry_run`。
 
-Missing parameter rules:
-- If `slug` is missing, ask for the target issue workflow slug.
+缺少参数时：
+- 如果缺少 `slug`，询问目标问题工作流的 slug。
 
-Fallback rule:
-- Only fall back to Bash + `cgc-fix` CLI when the MCP tool path is unavailable or the user explicitly wants CLI behavior.
-- Summarize the result briefly for the user.
+回退规则：
+- 只有在 MCP 工具路径不可用，或用户明确要求走 CLI 时，才回退到 Bash + `cgc-fix`。
+- 向用户用中文简要总结结果。
