@@ -47,6 +47,24 @@ npm install -g @hunyed15/codecgc --registry=https://registry.npmjs.org/
 cgc-install --mode user
 ```
 
+这会写入：
+
+- `~/.claude/mcp.json`
+- `~/.claude/hooks/route-edit.ps1`
+- `~/.claude/commands/cgc.md`
+- `~/.claude/commands/cgc-install.md`
+- `~/.claude/commands/cgc-status.md`
+- `~/.claude/commands/cgc-doctor.md`
+
+写入完成后，可以在 Claude 中直接输入：
+
+```text
+/cgc
+/cgc-install
+/cgc-status
+/cgc-doctor
+```
+
 如果安装阶段因为 Python 未就绪而跳过了这一步，可以在装好 Python 后手动补执行该命令。
 
 安装后，以下命令将全局可用：

@@ -64,6 +64,7 @@ def get_user_claude_paths(override_root: str = "") -> dict[str, Path]:
         "mcp": root / "mcp.json",
         "hooks_dir": root / "hooks",
         "hook_script": root / "hooks" / "route-edit.ps1",
+        "commands_dir": root / "commands",
     }
 
 
@@ -78,6 +79,7 @@ def get_workspace_paths(override_workspace: str = "") -> dict[str, Path]:
         "settings": claude_dir / "settings.json",
         "mcp": root / ".mcp.json",
         "hook_script": hooks_dir / "route-edit.ps1",
+        "commands_dir": claude_dir / "commands",
         "routing_file": root / "model-routing.yaml",
     }
 
@@ -108,6 +110,79 @@ def build_hook_payload(command_text: str) -> dict[str, Any]:
             }
         ]
     }
+
+
+def _normalize_command_path_for_markdown(path: Path) -> str:
+    return str(path).replace("\\", "\\\\")
+
+
+def build_custom_command_templates(bin_dir: Path) -> dict[str, str]:
+    cgc_js = _normalize_command_path_for_markdown(bin_dir / "cgc.js")
+    install_js = _normalize_command_path_for_markdown(bin_dir / "cgc-install.js")
+    status_js = _normalize_command_path_for_markdown(bin_dir / "cgc-status.js")
+    doctor_js = _normalize_command_path_for_markdown(bin_dir / "cgc-doctor.js")
+
+    return {
+        "cgc.md": f"""---
+description: Run CodeCGC in the current project
+argument-hint: "[request or flags]"
+---
+Use the Bash tool to run CodeCGC in the current project directory.
+
+- If the user supplied arguments, run:
+  `node "{cgc_js}" $ARGUMENTS`
+- If the user did not supply arguments, run:
+  `node "{cgc_js}" --help`
+- Show the command you ran and summarize the result briefly.
+""",
+        "cgc-install.md": f"""---
+description: Install or sync CodeCGC integration for the current project or user Claude profile
+argument-hint: "[flags]"
+---
+Use the Bash tool to run the CodeCGC install command.
+
+- If the user supplied arguments, run:
+  `node "{install_js}" $ARGUMENTS`
+- If the user did not supply arguments, run:
+  `node "{install_js}"`
+- Show the command you ran and summarize the result briefly.
+""",
+        "cgc-status.md": f"""---
+description: Check CodeCGC integration status
+argument-hint: "[flags]"
+---
+Use the Bash tool to run the CodeCGC status command.
+
+- If the user supplied arguments, run:
+  `node "{status_js}" $ARGUMENTS`
+- If the user did not supply arguments, run:
+  `node "{status_js}"`
+- Show the command you ran and summarize the result briefly.
+""",
+        "cgc-doctor.md": f"""---
+description: Run CodeCGC doctor checks
+argument-hint: "[flags]"
+---
+Use the Bash tool to run the CodeCGC doctor command.
+
+- If the user supplied arguments, run:
+  `node "{doctor_js}" $ARGUMENTS`
+- If the user did not supply arguments, run:
+  `node "{doctor_js}"`
+- Show the command you ran and summarize the result briefly.
+""",
+    }
+
+
+def write_custom_command_files(target_dir: Path, bin_dir: Path) -> list[str]:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    templates = build_custom_command_templates(bin_dir)
+    written: list[str] = []
+    for filename, content in templates.items():
+        path = target_dir / filename
+        path.write_text(content, encoding="utf-8")
+        written.append(str(path))
+    return written
 
 
 def merge_hook_settings(current: dict[str, Any], command_text: str) -> tuple[dict[str, Any], bool]:
@@ -240,6 +315,7 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
 
     if PROJECT_HOOK_PATH.resolve() != workspace_paths["hook_script"].resolve():
         shutil.copyfile(PROJECT_HOOK_PATH, workspace_paths["hook_script"])
+    written_commands = write_custom_command_files(workspace_paths["commands_dir"], WORKSPACE / "bin")
 
     summary = build_mode_summary_payload(
         scope="项目级 Claude 与 MCP 集成面",
@@ -255,10 +331,13 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
         "routing_file": str(routing_path),
         "claude_settings": str(workspace_paths["settings"]),
         "hook_script": str(workspace_paths["hook_script"]),
+        "commands_dir": str(workspace_paths["commands_dir"]),
+        "command_files": written_commands,
         "notes": [
             "Repository-local MCP config was synced from the executor registry.",
             "Project-local model-routing.yaml was synchronized and preserves custom path blocks.",
             "Claude pre-edit guardrail hook was synchronized into the target workspace.",
+            "Project-local Claude slash commands were synchronized into .claude/commands.",
             "This mode prepares project-level integration surfaces for the selected workspace.",
         ],
         "summary": summary,
@@ -290,11 +369,13 @@ def preview_user_install(override_root: str = "") -> dict[str, Any]:
             "settings_json": str(user_paths["settings"]),
             "mcp_json": str(user_paths["mcp"]),
             "hook_script": str(user_paths["hook_script"]),
+            "commands_dir": str(user_paths["commands_dir"]),
         },
         "would_write": {
             "settings_changed": settings_changed or not user_paths["settings"].exists(),
             "mcp_changed": True,
             "hook_changed": True,
+            "commands_changed": True,
         },
         "preview": {
             "settings": sanitize_for_preview(merged_settings),
@@ -313,12 +394,14 @@ def install_user_runtime(override_root: str = "") -> dict[str, Any]:
     user_paths = get_user_claude_paths(override_root)
     user_paths["root"].mkdir(parents=True, exist_ok=True)
     user_paths["hooks_dir"].mkdir(parents=True, exist_ok=True)
+    user_paths["commands_dir"].mkdir(parents=True, exist_ok=True)
 
     settings = load_json_file(user_paths["settings"])
     merged_settings, settings_changed = merge_hook_settings(settings, build_user_hook_command(user_paths))
     write_json_file(user_paths["settings"], merged_settings)
     write_json_file(user_paths["mcp"], build_mcp_config())
     shutil.copyfile(PROJECT_HOOK_PATH, user_paths["hook_script"])
+    written_commands = write_custom_command_files(user_paths["commands_dir"], WORKSPACE / "bin")
     summary = build_mode_summary_payload(
         scope="用户级 Claude 集成面",
         human_summary="用户级 Claude 集成文件已写入。",
@@ -334,15 +417,19 @@ def install_user_runtime(override_root: str = "") -> dict[str, Any]:
             "settings_json": str(user_paths["settings"]),
             "mcp_json": str(user_paths["mcp"]),
             "hook_script": str(user_paths["hook_script"]),
+            "commands_dir": str(user_paths["commands_dir"]),
         },
         "changes": {
             "settings_changed": settings_changed or not user_paths["settings"].exists(),
             "mcp_changed": True,
             "hook_changed": True,
+            "commands_changed": True,
         },
+        "command_files": written_commands,
         "notes": [
             "User-level Claude integration files were written to the selected root.",
             "The user-level hook script was copied from the project hook source.",
+            "User-level Claude slash commands were written to ~/.claude/commands.",
             "This mode is explicit and should be used only when a broader Claude integration surface is intended.",
         ],
         "summary": summary,
@@ -373,6 +460,7 @@ def build_install_mode_summary(result: dict[str, Any]) -> str:
             f"- Routing 文件: {result.get('routing_file', '')}",
             f"- Claude 设置: {result.get('claude_settings', '')}",
             f"- Hook 脚本: {result.get('hook_script', '')}",
+            f"- Slash Commands: {result.get('commands_dir', '')}",
             "- 说明: 可选外部能力如 MemOS 不由 cgc-install 自动写入；如需启用，请在 Claude 中单独配置官方 MCP。",
         ]
         next_actions = [
@@ -391,6 +479,7 @@ def build_install_mode_summary(result: dict[str, Any]) -> str:
             f"- 预演 Settings: {planned.get('settings_json', '')}",
             f"- 预演 MCP: {planned.get('mcp_json', '')}",
             f"- 预演 Hook: {planned.get('hook_script', '')}",
+            f"- 预演 Slash Commands: {planned.get('commands_dir', '')}",
             "- 说明: 该预演只覆盖 CodeCGC 必需执行器；MemOS 等可选外部能力仍建议在 Claude 中独立配置。",
         ]
         next_actions = []
@@ -410,6 +499,7 @@ def build_install_mode_summary(result: dict[str, Any]) -> str:
             f"- Settings: {written.get('settings_json', '')}",
             f"- MCP: {written.get('mcp_json', '')}",
             f"- Hook 脚本: {written.get('hook_script', '')}",
+            f"- Slash Commands: {written.get('commands_dir', '')}",
             "- 说明: 该安装只写入 CodeCGC 必需执行器；MemOS 等可选外部能力仍需在 Claude 中单独配置。",
         ]
         next_actions = [

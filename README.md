@@ -46,7 +46,19 @@ pip install pyyaml
 cgc-install --mode user
 ```
 
-全局安装完成后，CodeCGC 会尝试自动写入 Claude 用户级集成到 `~/.claude`。
+全局安装完成后，CodeCGC 会尝试自动写入 Claude 用户级集成到 `~/.claude`，包括：
+
+- `~/.claude/mcp.json`
+- `~/.claude/hooks/route-edit.ps1`
+- `~/.claude/commands/cgc*.md` 自定义 slash commands
+
+安装完成后，可以在 Claude 中直接使用：
+
+- `/cgc`
+- `/cgc-install`
+- `/cgc-status`
+- `/cgc-doctor`
+
 如果安装时 Python 尚未就绪，自动集成会跳过，此时可在安装 Python 后手动执行 `cgc-install --mode user`。
 
 ### 2. 初始化项目
