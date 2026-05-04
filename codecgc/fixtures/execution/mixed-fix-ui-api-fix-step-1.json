@@ -1,0 +1,52 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "dry-run",
+  "timestamp": "2026-05-01T09:34:54.558216+00:00",
+  "task_id": "mixed-fix-ui-api-fix-step-1",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "src/components/LoginForm.tsx"
+  ],
+  "route_notes": [
+    "src/components/LoginForm.tsx -> forced:frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\issues\\2026-05-01-mixed-fix-ui-api\\mixed-fix-ui-api-fix.yaml",
+    "artifact_type": "issue",
+    "artifact_slug": "2026-05-01-mixed-fix-ui-api",
+    "step_number": 1,
+    "step_action": "Apply one frontend fix step",
+    "artifact_class": "fixture"
+  },
+  "task_summary": "Apply only the approved frontend fix in src/components/LoginForm.tsx.",
+  "constraints": [
+    "Do not edit files outside target_paths.",
+    "Do not change backend APIs."
+  ],
+  "acceptance_criteria": [
+    "Frontend validation bug is fixed."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "mixed-fix-ui-api-fix-step-1",
+    "session_id": "",
+    "summary": "Dry run only. Task payload built but not executed.",
+    "changed_files": [
+      "src/components/LoginForm.tsx"
+    ],
+    "policy_checks": [
+      "dry_run_only"
+    ],
+    "risks": [
+      "execution_not_performed"
+    ],
+    "error": ""
+  }
+}

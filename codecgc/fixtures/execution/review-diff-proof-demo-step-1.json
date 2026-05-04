@@ -1,0 +1,77 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "execute",
+  "timestamp": "2026-05-03T10:00:00+00:00",
+  "task_id": "review-diff-proof-demo-step-1",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "src/components/ReviewDiffProofDemo.tsx"
+  ],
+  "route_notes": [
+    "src/components/ReviewDiffProofDemo.tsx -> frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-03-review-diff-proof-demo\\review-diff-proof-demo-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_slug": "2026-05-03-review-diff-proof-demo",
+    "step_number": 1,
+    "step_action": "Implement one frontend diff-proof feature step",
+    "artifact_class": "fixture"
+  },
+  "task_summary": "Implement only the approved frontend diff-proof demo step in src/components/ReviewDiffProofDemo.tsx.",
+  "constraints": [
+    "Do not edit files outside target_paths.",
+    "Do not change backend APIs."
+  ],
+  "acceptance_criteria": [
+    "Frontend review diff-proof demo is implemented."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "review-diff-proof-demo-step-1",
+    "session_id": "",
+    "summary": "Frontend review diff-proof demo was implemented.",
+    "changed_files": [
+      "src/components/ReviewDiffProofDemo.tsx"
+    ],
+    "policy_checks": [],
+    "risks": [],
+    "error": ""
+  },
+  "file_evidence": {
+    "evidence_source": "workspace-unified-diff-snapshot",
+    "workspace_changed_files": [
+      "src/components/ReviewDiffProofDemo.tsx"
+    ],
+    "verified_changed_files": [
+      "src/components/ReviewDiffProofDemo.tsx"
+    ],
+    "out_of_scope_changed_files": [],
+    "file_diffs": [
+      {
+        "path": "src/components/ReviewDiffProofDemo.tsx",
+        "change_type": "modified",
+        "before_hash": "demo-before-hash",
+        "after_hash": "demo-after-hash",
+        "before_size": 112,
+        "after_size": 214,
+        "before_preview": "export function ReviewDiffProofDemo() { return <div>Before</div>; }",
+        "after_preview": "export function ReviewDiffProofDemo() { return <section><h1>After</h1><p>Diff proof demo</p></section>; }",
+        "diff_excerpt": "--- a/src/components/ReviewDiffProofDemo.tsx\n+++ b/src/components/ReviewDiffProofDemo.tsx\n@@ -1,3 +1,6 @@\n export function ReviewDiffProofDemo() {\n-  return <div>Before</div>;\n+  return <section>\n+    <h1>After</h1>\n+    <p>Diff proof demo</p>\n+  </section>;\n }",
+        "diff_kind": "unified-text-diff",
+        "changed_line_count": 5,
+        "in_scope": true,
+        "scope_match_kind": "exact",
+        "matched_target": "src/components/ReviewDiffProofDemo.tsx"
+      }
+    ],
+    "evidence_confidence": "local-diff-verified"
+  }
+}

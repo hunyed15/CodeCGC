@@ -1,0 +1,18 @@
+issue: 2026-05-02-entry-environment-block-demo
+artifact_class: fixture
+created: 2026-05-03
+
+steps:
+  - action: "执行一个后端修复步骤"
+    exit_signal: "修复步骤已可进入委派执行"
+    status: pending
+    owner_hint: Claude 规划
+    planning_note: 当前规划输入仍不完整，在 CodeCGC 完成澄清前不要执行。
+
+checks:
+  - item: "混合或共享范围必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个 step"
+    source: owner-guard
+    status: pending

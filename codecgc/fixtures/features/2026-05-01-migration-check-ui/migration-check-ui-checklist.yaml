@@ -1,0 +1,24 @@
+feature: 2026-05-01-migration-check-ui
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Define one executable step"
+    exit_signal: "步骤契约已经可以进入委派执行"
+    status: pending
+    codecgc:
+      kind: frontend
+      task_id: migration-check-ui-step-1
+      task_summary: "Implement the approved step only."
+      target_paths:
+        - frontend/src/demo.tsx
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+      acceptance:
+        - Return a structured execution result.
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending

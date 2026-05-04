@@ -1,0 +1,53 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "dry-run",
+  "timestamp": "2026-05-01T08:48:37.681210+00:00",
+  "task_id": "structured-plan-ui-v2-step-1",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "src/components/LoginForm.tsx"
+  ],
+  "route_notes": [
+    "src/components/LoginForm.tsx -> forced:frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-01-structured-plan-ui-v2\\structured-plan-ui-v2-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_slug": "2026-05-01-structured-plan-ui-v2",
+    "step_number": 1,
+    "step_action": "Define one executable step",
+    "artifact_class": "fixture"
+  },
+  "task_summary": "Implement the approved step only.",
+  "constraints": [
+    "Do not edit files outside target_paths.",
+    "Do not change backend APIs."
+  ],
+  "acceptance_criteria": [
+    "Login form renders email and password fields.",
+    "Validation errors are visible before submit."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "structured-plan-ui-v2-step-1",
+    "session_id": "",
+    "summary": "Dry run only. Task payload built but not executed.",
+    "changed_files": [
+      "src/components/LoginForm.tsx"
+    ],
+    "policy_checks": [
+      "dry_run_only"
+    ],
+    "risks": [
+      "execution_not_performed"
+    ],
+    "error": ""
+  }
+}

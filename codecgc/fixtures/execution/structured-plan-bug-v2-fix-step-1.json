@@ -1,0 +1,53 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "dry-run",
+  "timestamp": "2026-05-01T08:48:37.681690+00:00",
+  "task_id": "structured-plan-bug-v2-fix-step-1",
+  "target": "backend",
+  "tool_name": "implement_backend_task",
+  "target_paths": [
+    "backend/src/sync.py"
+  ],
+  "route_notes": [
+    "backend/src/sync.py -> forced:backend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\issues\\2026-05-01-structured-plan-bug-v2\\structured-plan-bug-v2-fix.yaml",
+    "artifact_type": "issue",
+    "artifact_slug": "2026-05-01-structured-plan-bug-v2",
+    "step_number": 1,
+    "step_action": "Apply one scoped fix step",
+    "artifact_class": "fixture"
+  },
+  "task_summary": "Apply the approved fix step only.",
+  "constraints": [
+    "Do not edit files outside target_paths.",
+    "Do not change frontend UI behavior."
+  ],
+  "acceptance_criteria": [
+    "Malformed records are logged and skipped.",
+    "Remaining valid records still persist."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "structured-plan-bug-v2-fix-step-1",
+    "session_id": "",
+    "summary": "Dry run only. Task payload built but not executed.",
+    "changed_files": [
+      "backend/src/sync.py"
+    ],
+    "policy_checks": [
+      "dry_run_only"
+    ],
+    "risks": [
+      "execution_not_performed"
+    ],
+    "error": ""
+  }
+}

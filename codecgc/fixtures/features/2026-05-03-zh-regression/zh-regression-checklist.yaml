@@ -1,0 +1,18 @@
+feature: 2026-05-03-zh-regression
+artifact_class: fixture
+created: 2026-05-03
+
+steps:
+  - action: "定义一个可执行 step"
+    exit_signal: "step 契约已可进入委派执行"
+    status: pending
+    owner_hint: Claude 规划
+    planning_note: 当前规划输入仍不完整，在 CodeCGC 完成澄清前不要执行。
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个 step"
+    source: owner-guard
+    status: pending

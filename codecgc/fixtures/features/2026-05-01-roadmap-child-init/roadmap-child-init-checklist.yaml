@@ -1,0 +1,47 @@
+feature: 2026-05-01-roadmap-child-init
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "定义一个可执行的前端功能开发步骤"
+    exit_signal: "步骤契约已经可以进入委派执行"
+    status: pending
+    codecgc:
+      kind: frontend
+      task_id: roadmap-child-init-step-1
+      task_summary: "Implement only the approved frontend step in src/components/ChildRoadmapA.tsx and 2 more path(s)."
+      target_paths:
+        - src/components/ChildRoadmapA.tsx
+        - src/components/ChildRoadmapB.tsx
+        - src/components/ChildRoadmapC.tsx
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动后端 API。
+      acceptance:
+        - The large initiative is documented and child tracks are initialized.
+      cd: .
+  - action: "定义一个可执行的后端功能开发步骤"
+    exit_signal: "步骤契约已经可以进入委派执行"
+    status: pending
+    codecgc:
+      kind: backend
+      task_id: roadmap-child-init-step-2
+      task_summary: "Implement only the approved backend step in backend/api/child-a.ts and 2 more path(s)."
+      target_paths:
+        - backend/api/child-a.ts
+        - backend/api/child-b.ts
+        - backend/api/child-c.ts
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动前端 UI 行为。
+      acceptance:
+        - The large initiative is documented and child tracks are initialized.
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

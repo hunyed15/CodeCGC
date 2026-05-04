@@ -1,0 +1,52 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "dry-run",
+  "timestamp": "2026-05-01T09:26:07.839528+00:00",
+  "task_id": "progression-demo-step-1",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "src/components/ProgressionDemo.tsx"
+  ],
+  "route_notes": [
+    "src/components/ProgressionDemo.tsx -> forced:frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-01-progression-demo\\progression-demo-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_slug": "2026-05-01-progression-demo",
+    "step_number": 1,
+    "step_action": "Implement one frontend feature step",
+    "artifact_class": "fixture"
+  },
+  "task_summary": "Implement only the approved frontend step in src/components/ProgressionDemo.tsx.",
+  "constraints": [
+    "Do not edit files outside target_paths.",
+    "Do not change backend APIs."
+  ],
+  "acceptance_criteria": [
+    "Frontend progression demo is implemented."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "progression-demo-step-1",
+    "session_id": "",
+    "summary": "Dry run only. Task payload built but not executed.",
+    "changed_files": [
+      "src/components/ProgressionDemo.tsx"
+    ],
+    "policy_checks": [
+      "dry_run_only"
+    ],
+    "risks": [
+      "execution_not_performed"
+    ],
+    "error": ""
+  }
+}

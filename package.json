@@ -1,0 +1,90 @@
+{
+  "name": "@hunyed15/codecgc",
+  "version": "0.1.0",
+  "description": "Claude-hosted multi-model workflow product shell for CodeCGC.",
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": {
+    "cgc": "bin/cgc.js",
+    "cgc-install": "bin/cgc-install.js",
+    "cgc-status": "bin/cgc-status.js",
+    "cgc-doctor": "bin/cgc-doctor.js",
+    "cgc-package-audit": "bin/cgc-package-audit.js",
+    "cgc-external-audit": "bin/cgc-external-audit.js",
+    "cgc-release-readiness": "bin/cgc-release-readiness.js",
+    "cgc-lifecycle": "bin/cgc-lifecycle.js",
+    "cgc-history": "bin/cgc-history.js",
+    "cgc-entry": "bin/cgc-entry.js",
+    "cgc-plan": "bin/cgc-plan.js",
+    "cgc-build": "bin/cgc-build.js",
+    "cgc-fix": "bin/cgc-fix.js",
+    "cgc-test": "bin/cgc-test.js",
+    "cgc-review": "bin/cgc-review.js",
+    "cgc-route": "bin/cgc-route.js"
+  },
+  "scripts": {
+    "cgc:help": "node bin/cgc.js --help",
+    "cgc:status": "node bin/cgc-status.js --format summary",
+    "cgc:doctor": "node bin/cgc-doctor.js --format summary",
+    "cgc:package-audit": "node bin/cgc-package-audit.js --format summary",
+    "cgc:external-audit": "node bin/cgc-external-audit.js --format summary",
+    "cgc:release-readiness": "node bin/cgc-release-readiness.js --format summary",
+    "cgc:lifecycle": "node bin/cgc-lifecycle.js --format summary",
+    "cgc:history": "node bin/cgc-history.js --status open --last 10 --format summary",
+    "cgc:audit-historical-audits": "python scripts/audit_codecgc_historical_audits.py --format summary",
+    "cgc:audit-review-policy": "python scripts/audit_codecgc_review_policy.py --artifact-class all --format summary",
+    "cgc:refresh-review-policy": "python scripts/refresh_codecgc_review_policy.py --artifact-class all --write",
+    "cgc:pack-dry-run": "npm pack --dry-run"
+  },
+  "files": [
+    "bin/",
+    "scripts/*.py",
+    "scripts/README-codecgc-cli.md",
+    ".claude/hooks/route-edit.ps1",
+    "codecgc/cgc/",
+    "codecgc/cgc-arch/",
+    "codecgc/cgc-build/",
+    "codecgc/cgc-decide/",
+    "codecgc/cgc-fix/",
+    "codecgc/cgc-learn/",
+    "codecgc/cgc-onboard/",
+    "codecgc/cgc-plan/",
+    "codecgc/cgc-refactor/",
+    "codecgc/cgc-req/",
+    "codecgc/cgc-review/",
+    "codecgc/cgc-roadmap/",
+    "codecgc/cgc-test/",
+    "codecgc/reference/",
+    "codexmcp/pyproject.toml",
+    "codexmcp/README.md",
+    "codexmcp/LICENSE",
+    "codexmcp/src/codexmcp/",
+    "geminimcp/pyproject.toml",
+    "geminimcp/README.md",
+    "geminimcp/src/geminimcp/",
+    "requirements.txt",
+    "INSTALLATION.md",
+    "model-routing.yaml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude",
+    "mcp",
+    "workflow",
+    "codex",
+    "gemini",
+    "multi-model"
+  ],
+  "homepage": "https://github.com/hunyed15/CodeCGC",
+  "bugs": {
+    "url": "https://github.com/hunyed15/CodeCGC/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hunyed15/CodeCGC.git"
+  }
+}

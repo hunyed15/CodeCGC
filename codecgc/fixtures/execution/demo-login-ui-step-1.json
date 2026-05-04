@@ -1,0 +1,51 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "dry-run",
+  "timestamp": "2026-05-01T07:58:13.804398+00:00",
+  "task_id": "demo-login-ui-step-1",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "src/components/LoginForm.tsx"
+  ],
+  "route_notes": [
+    "src/components/LoginForm.tsx -> forced:frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-01-demo-login-ui\\demo-login-ui-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_slug": "2026-05-01-demo-login-ui",
+    "step_number": 1,
+    "step_action": "Define one executable step",
+    "artifact_class": "fixture"
+  },
+  "task_summary": "Implement the approved step only.",
+  "constraints": [
+    "Do not edit files outside target_paths."
+  ],
+  "acceptance_criteria": [
+    "Return a structured execution result."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "demo-login-ui-step-1",
+    "session_id": "",
+    "summary": "Dry run only. Task payload built but not executed.",
+    "changed_files": [
+      "src/components/LoginForm.tsx"
+    ],
+    "policy_checks": [
+      "dry_run_only"
+    ],
+    "risks": [
+      "execution_not_performed"
+    ],
+    "error": ""
+  }
+}

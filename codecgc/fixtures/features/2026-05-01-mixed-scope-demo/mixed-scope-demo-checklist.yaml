@@ -1,0 +1,20 @@
+feature: 2026-05-01-mixed-scope-demo
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Deliberately mixed scope step"
+    exit_signal: "This should be rejected before execution"
+    status: pending
+    codecgc:
+      kind: auto
+      task_id: mixed-scope-demo-step-1
+      task_summary: "Try to edit mixed frontend and backend files in one step."
+      target_paths:
+        - src/components/LoginForm.tsx
+        - backend/src/sync.py
+      constraints:
+        - Do not expand scope beyond the listed files.
+      acceptance:
+        - The wrapper should reject mixed executor scope.
+      cd: .

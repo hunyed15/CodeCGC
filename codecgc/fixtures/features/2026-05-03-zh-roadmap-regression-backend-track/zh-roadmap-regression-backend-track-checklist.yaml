@@ -1,0 +1,28 @@
+feature: 2026-05-03-zh-roadmap-regression-backend-track
+artifact_class: fixture
+created: 2026-05-03
+
+steps:
+  - action: "执行一个后端功能 step"
+    exit_signal: "step 契约已可进入委派执行"
+    status: pending
+    codecgc:
+      kind: backend
+      task_id: zh-roadmap-regression-backend-track-step-1
+      task_summary: "只在 apps/api/src/server.ts 内实现已批准的后端 step。"
+      target_paths:
+        - apps/api/src/server.ts
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动前端 UI 行为。
+      acceptance:
+        - 后端 track 输出完整、可审核、且范围明确。
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个 step"
+    source: owner-guard
+    status: pending

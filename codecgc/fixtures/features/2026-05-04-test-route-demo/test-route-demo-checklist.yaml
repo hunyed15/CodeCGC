@@ -1,0 +1,47 @@
+feature: 2026-05-04-test-route-demo
+artifact_class: fixture
+created: 2026-05-04
+
+steps:
+  - action: "执行一个前端功能步骤"
+    exit_signal: "步骤契约已可进入委派执行"
+    status: done
+    codecgc:
+      kind: frontend
+      task_id: test-route-demo-step-1
+      task_summary: "只在 src/components/TestRouteDemo.tsx 内实现已批准的前端步骤。"
+      target_paths:
+        - src/components/TestRouteDemo.tsx
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动后端 API。
+      acceptance:
+        - 组件可渲染。
+      cd: .
+  - action: "执行一个前端测试补充步骤"
+    exit_signal: "测试步骤已可进入委派执行"
+    status: pending
+    codecgc:
+      kind: frontend
+      step_type: test
+      task_id: test-route-demo-test-step-2
+      task_summary: "只补充当前已批准的功能开发前端测试步骤。"
+      target_paths:
+        - src/components/TestRouteDemo.test.tsx
+      constraints:
+        - 不要修改测试范围外的业务文件。
+        - 不要新增后端 API 逻辑。
+      acceptance:
+        - 返回结构化执行结果。
+        - 只补充或更新当前范围内的测试。
+        - 测试相关变更文件必须保持在 target_paths 范围内。
+        - 优先覆盖界面、交互或前端行为回归。
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

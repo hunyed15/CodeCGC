@@ -1,0 +1,54 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "dry-run",
+  "timestamp": "2026-05-01T10:04:07.067145+00:00",
+  "task_id": "artifact-class-ui-demo-step-1",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "frontend/demo-panel.tsx"
+  ],
+  "route_notes": [
+    "frontend/demo-panel.tsx -> forced:frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-01-artifact-class-ui-demo\\artifact-class-ui-demo-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_class": "fixture",
+    "artifact_slug": "2026-05-01-artifact-class-ui-demo",
+    "step_number": 1,
+    "step_action": "Define one executable step"
+  },
+  "task_summary": "Implement the approved step only.",
+  "constraints": [
+    "Do not edit files outside target_paths.",
+    "Do not change backend APIs."
+  ],
+  "acceptance_criteria": [
+    "Return a structured execution result.",
+    "Changed files stay inside target_paths.",
+    "Frontend-visible behavior matches the scoped step only."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "artifact-class-ui-demo-step-1",
+    "session_id": "",
+    "summary": "Dry run only. Task payload built but not executed.",
+    "changed_files": [
+      "frontend/demo-panel.tsx"
+    ],
+    "policy_checks": [
+      "dry_run_only"
+    ],
+    "risks": [
+      "execution_not_performed"
+    ],
+    "error": ""
+  }
+}

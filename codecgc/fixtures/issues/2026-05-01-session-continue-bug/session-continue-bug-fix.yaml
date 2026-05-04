@@ -1,0 +1,24 @@
+issue: 2026-05-01-session-continue-bug
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Apply one scoped fix step"
+    exit_signal: "Fix step is ready for delegated execution"
+    status: pending
+    codecgc:
+      kind: backend
+      task_id: session-continue-bug-fix-step-1
+      task_summary: "Apply the approved fix step only."
+      target_paths:
+        - backend/session/continue.py
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+      acceptance:
+        - Return a structured execution result.
+      cd: .
+
+checks:
+  - item: "Mixed or shared scope must be split first"
+    source: scope-guard
+    status: pending

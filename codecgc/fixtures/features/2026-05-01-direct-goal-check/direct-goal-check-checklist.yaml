@@ -1,0 +1,28 @@
+feature: 2026-05-01-direct-goal-check
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Define one executable step"
+    exit_signal: "步骤契约已经可以进入委派执行"
+    status: pending
+    codecgc:
+      kind: frontend
+      task_id: direct-goal-check-step-1
+      task_summary: "Implement the approved step only."
+      target_paths:
+        - frontend/src/direct-goal.tsx
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动后端 API。
+      acceptance:
+        - Changed files stay in frontend/src/direct-goal.tsx.
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

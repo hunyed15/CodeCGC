@@ -1,0 +1,30 @@
+issue: 2026-05-01-structured-plan-bug
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Apply one scoped fix step"
+    exit_signal: "Fix step is ready for delegated execution"
+    status: pending
+    codecgc:
+      kind: backend
+      task_id: structured-plan-bug-fix-step-1
+      task_summary: "Apply the approved fix step only."
+      target_paths:
+        - backend/src/structured-plan.py
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动前端 UI 行为。
+      acceptance:
+        - Return a structured execution result.
+        - Changed files stay inside target_paths.
+        - Backend behavior change stays within the scoped fix or feature step.
+      cd: .
+
+checks:
+  - item: "Mixed or shared scope must be split first"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

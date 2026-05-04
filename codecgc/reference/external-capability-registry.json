@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "last_updated": "2026-05-03",
+  "capabilities": [
+    {
+      "id": "codexmcp",
+      "name": "Codex MCP",
+      "category": "executor",
+      "integration_type": "embedded-mcp",
+      "status": "integrated",
+      "required": true,
+      "owner": "CodeCGC",
+      "probe_kind": "executor",
+      "executor_target": "backend",
+      "mcp_server_names": ["codex"],
+      "description": "后端执行器，负责 backend build/fix 的实际编码。"
+    },
+    {
+      "id": "geminimcp",
+      "name": "Gemini MCP",
+      "category": "executor",
+      "integration_type": "embedded-mcp",
+      "status": "integrated",
+      "required": true,
+      "owner": "CodeCGC",
+      "probe_kind": "executor",
+      "executor_target": "frontend",
+      "mcp_server_names": ["gemini"],
+      "description": "前端执行器，负责 frontend build/fix 的实际编码。"
+    },
+    {
+      "id": "memos",
+      "name": "MemOS",
+      "category": "memory",
+      "integration_type": "external-mcp",
+      "status": "integrated",
+      "required": false,
+      "owner": "External",
+      "probe_kind": "workspace-mcp",
+      "mcp_server_names": ["memos", "mem-os", "memos-mcp"],
+      "description": "持久记忆能力，使用官方 MemOS MCP；CodeCGC 只负责正式纳管、状态审计与协作约束，不重做记忆引擎本体。"
+    },
+    {
+      "id": "augment-search",
+      "name": "Augment Search Via Ace Tool",
+      "category": "code-search",
+      "integration_type": "external-mcp",
+      "status": "integrated",
+      "required": false,
+      "owner": "External",
+      "probe_kind": "workspace-mcp",
+      "mcp_server_names": ["ace-tool", "augment", "auggie"],
+      "description": "代码检索与语义上下文增强能力，优先复用 ace-tool 这一现成 MCP 接入面；CodeCGC 只负责正式纳管、状态审计与协作约束，不重做检索引擎本体。"
+    },
+    {
+      "id": "github-mcp",
+      "name": "GitHub MCP",
+      "category": "scm",
+      "integration_type": "external-mcp",
+      "status": "integrated",
+      "required": false,
+      "owner": "External",
+      "probe_kind": "workspace-mcp",
+      "mcp_server_names": ["github"],
+      "description": "源码托管、PR、issue 与发布协同能力，优先复用 github/github-mcp-server 官方 MCP；CodeCGC 只负责正式纳管、状态审计与协作约束，不重做 GitHub 平台能力本体。"
+    },
+    {
+      "id": "linear-mcp",
+      "name": "Linear MCP",
+      "category": "project-management",
+      "integration_type": "external-mcp",
+      "status": "integrated",
+      "required": false,
+      "owner": "External",
+      "probe_kind": "workspace-mcp",
+      "mcp_server_names": ["linear", "linear-server"],
+      "description": "需求、任务、缺陷与项目节奏管理能力，优先复用 Linear 官方 remote MCP；CodeCGC 只负责正式纳管、状态审计与协作约束，不重做 Linear 平台能力本体。"
+    },
+    {
+      "id": "jira-mcp",
+      "name": "Jira Or Atlassian MCP",
+      "category": "project-management",
+      "integration_type": "external-mcp",
+      "status": "planned",
+      "required": false,
+      "owner": "External",
+      "probe_kind": "workspace-mcp",
+      "mcp_server_names": ["jira", "atlassian"],
+      "description": "Atlassian / Jira 项目管理能力，当前仍保留为受控预留位，后续单独评估与纳管。"
+    },
+    {
+      "id": "sentry-mcp",
+      "name": "Sentry MCP",
+      "category": "observability",
+      "integration_type": "external-mcp",
+      "status": "planned",
+      "required": false,
+      "owner": "External",
+      "probe_kind": "workspace-mcp",
+      "mcp_server_names": ["sentry"],
+      "description": "线上异常、堆栈、事件追踪与问题回流能力。"
+    }
+  ]
+}

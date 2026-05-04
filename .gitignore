@@ -1,0 +1,13 @@
+.ace-tool/
+.github/.DS_Store
+*.tgz
+*.pyc
+*.pyo
+*.pyd
+*.log
+__pycache__/
+**/__pycache__/
+*.egg-info/
+node_modules/
+codexmcp/.venv/
+geminimcp/.venv/

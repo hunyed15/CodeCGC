@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "codex": {
+      "command": "C:\\Python314\\python.exe",
+      "args": [
+        "-m",
+        "codexmcp.cli"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\Software\\VibeCoding\\CodeCGC\\codexmcp\\src"
+      }
+    },
+    "gemini": {
+      "command": "C:\\Python314\\python.exe",
+      "args": [
+        "-m",
+        "geminimcp.cli"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\Software\\VibeCoding\\CodeCGC\\geminimcp\\src"
+      }
+    }
+  }
+}

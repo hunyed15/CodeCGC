@@ -1,0 +1,938 @@
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+from codecgc_console_io import render_summary_block
+from codecgc_executor_registry import build_executor_registry
+from codecgc_executor_registry import resolve_python_command
+from codecgc_routing_template import sync_workspace_routing_file
+from codecgc_runtime_paths import PACKAGE_ROOT
+from codecgc_runtime_paths import resolve_workspace_root
+from sync_codecgc_mcp_config import build_mcp_config
+from sync_codecgc_mcp_config import write_mcp_config
+
+
+WORKSPACE = PACKAGE_ROOT
+CLAUDE_DIR = WORKSPACE / ".claude"
+HOOKS_DIR = CLAUDE_DIR / "hooks"
+SETTINGS_PATH = CLAUDE_DIR / "settings.json"
+MCP_CONFIG_PATH = WORKSPACE / ".mcp.json"
+PROJECT_HOOK_PATH = HOOKS_DIR / "route-edit.ps1"
+PROJECT_ROUTING_PATH = WORKSPACE / "model-routing.yaml"
+
+
+DEFAULT_HOOKS = {
+    "PreToolUse": [
+        {
+            "matcher": "Edit|Write",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/route-edit.ps1",
+                }
+            ],
+        }
+    ]
+}
+
+SENSITIVE_KEYWORDS = ("token", "secret", "key", "password", "auth")
+MCP_RUNTIME_REQUIREMENT = 'mcp[cli]>=1.21.2'
+
+
+def get_user_claude_root(override_root: str = "") -> Path:
+    override = override_root.strip() or os.environ.get("CODECGC_USER_CLAUDE_DIR", "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+
+    if os.name == "nt":
+        base = Path(os.environ.get("USERPROFILE", str(Path.home())))
+    else:
+        base = Path.home()
+    return (base / ".claude").resolve()
+
+
+def get_user_claude_paths(override_root: str = "") -> dict[str, Path]:
+    root = get_user_claude_root(override_root)
+    return {
+        "root": root,
+        "settings": root / "settings.json",
+        "mcp": root / "mcp.json",
+        "hooks_dir": root / "hooks",
+        "hook_script": root / "hooks" / "route-edit.ps1",
+    }
+
+
+def get_workspace_paths(override_workspace: str = "") -> dict[str, Path]:
+    root = resolve_workspace_root(override_workspace)
+    claude_dir = root / ".claude"
+    hooks_dir = claude_dir / "hooks"
+    return {
+        "root": root,
+        "claude_dir": claude_dir,
+        "hooks_dir": hooks_dir,
+        "settings": claude_dir / "settings.json",
+        "mcp": root / ".mcp.json",
+        "hook_script": hooks_dir / "route-edit.ps1",
+        "routing_file": root / "model-routing.yaml",
+    }
+
+
+def load_json_file(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_text_file(path: Path) -> str:
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8")
+
+
+def build_hook_payload(command_text: str) -> dict[str, Any]:
+    return {
+        "PreToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": command_text,
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def merge_hook_settings(current: dict[str, Any], command_text: str) -> tuple[dict[str, Any], bool]:
+    hooks = current.get("hooks")
+    expected_hooks = build_hook_payload(command_text)
+    if not isinstance(hooks, dict):
+        current["hooks"] = expected_hooks
+        return current, True
+
+    pre_tool_use = hooks.get("PreToolUse")
+    if not isinstance(pre_tool_use, list):
+        hooks["PreToolUse"] = expected_hooks["PreToolUse"]
+        return current, True
+
+    expected = expected_hooks["PreToolUse"][0]
+    for item in pre_tool_use:
+        if not isinstance(item, dict):
+            continue
+        if item.get("matcher") != expected["matcher"]:
+            continue
+        hook_list = item.get("hooks")
+        if not isinstance(hook_list, list):
+            item["hooks"] = expected["hooks"]
+            return current, True
+        for hook in hook_list:
+            if not isinstance(hook, dict):
+                continue
+            if hook.get("type") == "command" and hook.get("command") == expected["hooks"][0]["command"]:
+                return current, False
+        hook_list.append(expected["hooks"][0])
+        return current, True
+
+    pre_tool_use.append(expected)
+    return current, True
+
+
+def write_json_file(path: Path, payload: dict[str, Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def shell_quote(value: str) -> str:
+    text = str(value)
+    if not text:
+        return '""'
+    if any(char.isspace() for char in text) or any(char in text for char in '"&()[]{}^=;!+,`~'):
+        escaped = text.replace('"', '\\"')
+        return f'"{escaped}"'
+    return text
+
+
+def is_sensitive_key(key: str) -> bool:
+    lowered = key.lower()
+    return any(keyword in lowered for keyword in SENSITIVE_KEYWORDS)
+
+
+def sanitize_for_preview(value: Any, key_hint: str = "") -> Any:
+    if isinstance(value, dict):
+        return {
+            str(key): ("***REDACTED***" if is_sensitive_key(str(key)) else sanitize_for_preview(item, str(key)))
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [sanitize_for_preview(item, key_hint) for item in value]
+    if is_sensitive_key(key_hint):
+        return "***REDACTED***"
+    return value
+
+
+def settings_have_hook_command(settings: dict[str, Any], command_text: str) -> bool:
+    hooks = settings.get("hooks")
+    if not isinstance(hooks, dict):
+        return False
+    pre_tool_use = hooks.get("PreToolUse")
+    if not isinstance(pre_tool_use, list):
+        return False
+    for item in pre_tool_use:
+        if not isinstance(item, dict):
+            continue
+        if item.get("matcher") != "Edit|Write":
+            continue
+        hook_list = item.get("hooks")
+        if not isinstance(hook_list, list):
+            continue
+        for hook in hook_list:
+            if not isinstance(hook, dict):
+                continue
+            if hook.get("type") == "command" and hook.get("command") == command_text:
+                return True
+    return False
+
+
+def build_workspace_hook_command(workspace_paths: dict[str, Path]) -> str:
+    return "powershell -ExecutionPolicy Bypass -File .claude/hooks/route-edit.ps1"
+
+
+def build_mode_summary_payload(
+    *,
+    scope: str,
+    human_summary: str,
+    recommended_next_action: str = "",
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    summary = {
+        "scope": scope,
+        "human_summary": human_summary,
+        "recommended_next_action": recommended_next_action,
+    }
+    if extra:
+        summary.update(extra)
+    return summary
+
+
+def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
+    workspace_paths = get_workspace_paths(override_workspace)
+    mcp_path = write_mcp_config(workspace_paths["mcp"])
+    routing_path = sync_workspace_routing_file(workspace_paths["routing_file"])
+
+    workspace_paths["claude_dir"].mkdir(parents=True, exist_ok=True)
+    workspace_paths["hooks_dir"].mkdir(parents=True, exist_ok=True)
+
+    settings = load_json_file(workspace_paths["settings"])
+    merged_settings, settings_changed = merge_hook_settings(
+        settings,
+        build_workspace_hook_command(workspace_paths),
+    )
+    if settings_changed or not workspace_paths["settings"].exists():
+        write_json_file(workspace_paths["settings"], merged_settings)
+
+    if PROJECT_HOOK_PATH.resolve() != workspace_paths["hook_script"].resolve():
+        shutil.copyfile(PROJECT_HOOK_PATH, workspace_paths["hook_script"])
+
+    summary = build_mode_summary_payload(
+        scope="项目级 Claude 与 MCP 集成面",
+        human_summary="项目级 CodeCGC 集成文件已同步。",
+        recommended_next_action="cgc-status",
+    )
+
+    return {
+        "success": True,
+        "mode": "local",
+        "workspace": str(workspace_paths["root"]),
+        "mcp_config": str(mcp_path),
+        "routing_file": str(routing_path),
+        "claude_settings": str(workspace_paths["settings"]),
+        "hook_script": str(workspace_paths["hook_script"]),
+        "notes": [
+            "Repository-local MCP config was synced from the executor registry.",
+            "Project-local model-routing.yaml was synchronized and preserves custom path blocks.",
+            "Claude pre-edit guardrail hook was synchronized into the target workspace.",
+            "This mode prepares project-level integration surfaces for the selected workspace.",
+        ],
+        "summary": summary,
+    }
+
+
+def build_user_hook_command(user_paths: dict[str, Path]) -> str:
+    return f"powershell -ExecutionPolicy Bypass -File {user_paths['hook_script']}"
+
+
+def preview_user_install(override_root: str = "") -> dict[str, Any]:
+    user_paths = get_user_claude_paths(override_root)
+    user_settings = load_json_file(user_paths["settings"])
+    merged_settings, settings_changed = merge_hook_settings(user_settings, build_user_hook_command(user_paths))
+    mcp_config = build_mcp_config()
+    recommended_next_action = f"cgc-install --mode user --user-root {shell_quote(str(user_paths['root']))}"
+    summary = build_mode_summary_payload(
+        scope="用户级 Claude 集成预演",
+        human_summary="已完成用户级 Claude 集成预演，未写入任何文件。",
+        recommended_next_action=recommended_next_action,
+    )
+
+    return {
+        "success": True,
+        "mode": "user-dry-run",
+        "workspace": str(WORKSPACE),
+        "user_claude_root": str(user_paths["root"]),
+        "planned_files": {
+            "settings_json": str(user_paths["settings"]),
+            "mcp_json": str(user_paths["mcp"]),
+            "hook_script": str(user_paths["hook_script"]),
+        },
+        "would_write": {
+            "settings_changed": settings_changed or not user_paths["settings"].exists(),
+            "mcp_changed": True,
+            "hook_changed": True,
+        },
+        "preview": {
+            "settings": sanitize_for_preview(merged_settings),
+            "mcp": mcp_config,
+        },
+        "notes": [
+            "This mode does not modify user-level Claude files.",
+            "Use this preview to inspect the future user-level integration surface.",
+            "Current CodeCGC product policy still defaults to project-local installation.",
+        ],
+        "summary": summary,
+    }
+
+
+def install_user_runtime(override_root: str = "") -> dict[str, Any]:
+    user_paths = get_user_claude_paths(override_root)
+    user_paths["root"].mkdir(parents=True, exist_ok=True)
+    user_paths["hooks_dir"].mkdir(parents=True, exist_ok=True)
+
+    settings = load_json_file(user_paths["settings"])
+    merged_settings, settings_changed = merge_hook_settings(settings, build_user_hook_command(user_paths))
+    write_json_file(user_paths["settings"], merged_settings)
+    write_json_file(user_paths["mcp"], build_mcp_config())
+    shutil.copyfile(PROJECT_HOOK_PATH, user_paths["hook_script"])
+    summary = build_mode_summary_payload(
+        scope="用户级 Claude 集成面",
+        human_summary="用户级 Claude 集成文件已写入。",
+        recommended_next_action="cgc-install --mode status",
+    )
+
+    return {
+        "success": True,
+        "mode": "user",
+        "workspace": str(WORKSPACE),
+        "user_claude_root": str(user_paths["root"]),
+        "written_files": {
+            "settings_json": str(user_paths["settings"]),
+            "mcp_json": str(user_paths["mcp"]),
+            "hook_script": str(user_paths["hook_script"]),
+        },
+        "changes": {
+            "settings_changed": settings_changed or not user_paths["settings"].exists(),
+            "mcp_changed": True,
+            "hook_changed": True,
+        },
+        "notes": [
+            "User-level Claude integration files were written to the selected root.",
+            "The user-level hook script was copied from the project hook source.",
+            "This mode is explicit and should be used only when a broader Claude integration surface is intended.",
+        ],
+        "summary": summary,
+    }
+
+
+def build_workspace_install_command(workspace_root: Path) -> str:
+    return f"cgc-install --mode local --workspace {shell_quote(str(workspace_root))}"
+
+
+def build_user_preview_command(user_root: Path) -> str:
+    return f"cgc-install --mode user-dry-run --user-root {shell_quote(str(user_root))}"
+
+
+def build_doctor_fix_command(workspace_root: Path) -> str:
+    return f"cgc-install --workspace {shell_quote(str(workspace_root))}"
+
+
+def build_install_mode_summary(result: dict[str, Any]) -> str:
+    mode = str(result.get("mode", "")).strip()
+
+    if mode == "local":
+        lines = [
+            f"- 工作区: {result.get('workspace', '')}",
+            "- 范围: 项目级 Claude 与 MCP 集成面",
+            "- 摘要: 项目级 CodeCGC 集成文件已同步。",
+            f"- MCP 配置: {result.get('mcp_config', '')}",
+            f"- Routing 文件: {result.get('routing_file', '')}",
+            f"- Claude 设置: {result.get('claude_settings', '')}",
+            f"- Hook 脚本: {result.get('hook_script', '')}",
+            "- 说明: 可选外部能力如 MemOS 不由 cgc-install 自动写入；如需启用，请在 Claude 中单独配置官方 MCP。",
+        ]
+        next_actions = [
+            "cgc-status",
+            "cgc-doctor",
+        ]
+        return render_summary_block("CodeCGC 安装", lines, next_actions)
+
+    if mode == "user-dry-run":
+        planned = result.get("planned_files", {}) if isinstance(result.get("planned_files"), dict) else {}
+        lines = [
+            f"- 工作区: {result.get('workspace', '')}",
+            f"- 用户 Claude 根目录: {result.get('user_claude_root', '')}",
+            "- 范围: 用户级 Claude 集成预演",
+            "- 摘要: 已完成用户级 Claude 集成预演，未写入任何文件。",
+            f"- 预演 Settings: {planned.get('settings_json', '')}",
+            f"- 预演 MCP: {planned.get('mcp_json', '')}",
+            f"- 预演 Hook: {planned.get('hook_script', '')}",
+            "- 说明: 该预演只覆盖 CodeCGC 必需执行器；MemOS 等可选外部能力仍建议在 Claude 中独立配置。",
+        ]
+        next_actions = []
+        user_root = str(result.get("user_claude_root", "")).strip()
+        if user_root:
+            next_actions.append(f"cgc-install --mode user --user-root {shell_quote(user_root)}")
+        next_actions.append("cgc-install --mode status")
+        return render_summary_block("CodeCGC 用户级预演", lines, next_actions)
+
+    if mode == "user":
+        written = result.get("written_files", {}) if isinstance(result.get("written_files"), dict) else {}
+        lines = [
+            f"- 工作区: {result.get('workspace', '')}",
+            f"- 用户 Claude 根目录: {result.get('user_claude_root', '')}",
+            "- 范围: 用户级 Claude 集成面",
+            "- 摘要: 用户级 Claude 集成文件已写入。",
+            f"- Settings: {written.get('settings_json', '')}",
+            f"- MCP: {written.get('mcp_json', '')}",
+            f"- Hook 脚本: {written.get('hook_script', '')}",
+            "- 说明: 该安装只写入 CodeCGC 必需执行器；MemOS 等可选外部能力仍需在 Claude 中单独配置。",
+        ]
+        next_actions = [
+            "cgc-install --mode status",
+            "cgc-doctor",
+        ]
+        return render_summary_block("CodeCGC 用户级安装", lines, next_actions)
+
+    return ""
+
+
+def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
+    expected_mcp = build_mcp_config()
+    expected_hook_command = build_workspace_hook_command(workspace_paths)
+    expected_hook_text = load_text_file(PROJECT_HOOK_PATH)
+    current_settings = load_json_file(workspace_paths["settings"])
+    current_mcp = load_json_file(workspace_paths["mcp"])
+    current_hook_text = load_text_file(workspace_paths["hook_script"])
+    routing_exists = workspace_paths["routing_file"].exists()
+
+    hook_registered = settings_have_hook_command(current_settings, expected_hook_command)
+    mcp_matches = current_mcp == expected_mcp if workspace_paths["mcp"].exists() else False
+    hook_file_matches = current_hook_text == expected_hook_text if workspace_paths["hook_script"].exists() else False
+
+    missing = []
+    if not routing_exists:
+        missing.append("routing_file")
+    if not mcp_matches:
+        missing.append("mcp_json")
+    if not hook_registered:
+        missing.append("claude_settings_hook")
+    if not hook_file_matches:
+        missing.append("hook_script")
+
+    ready = not missing
+    return {
+        "mcp_json_path": str(workspace_paths["mcp"]),
+        "routing_file_path": str(workspace_paths["routing_file"]),
+        "claude_settings_path": str(workspace_paths["settings"]),
+        "hook_script_path": str(workspace_paths["hook_script"]),
+        "mcp_json_exists": workspace_paths["mcp"].exists(),
+        "routing_file_exists": routing_exists,
+        "claude_settings_exists": workspace_paths["settings"].exists(),
+        "hook_exists": workspace_paths["hook_script"].exists(),
+        "mcp_matches_expected": mcp_matches,
+        "hook_registered": hook_registered,
+        "hook_file_matches_expected": hook_file_matches,
+        "ready": ready,
+        "missing_or_outdated": missing,
+        "recommended_command": "" if ready else build_workspace_install_command(workspace_paths["root"]),
+        "hook_expected": {"hooks": build_hook_payload(expected_hook_command)},
+    }
+
+
+def collect_user_status(user_paths: dict[str, Path]) -> dict[str, Any]:
+    expected_mcp = build_mcp_config()
+    expected_hook_command = build_user_hook_command(user_paths)
+    expected_hook_text = load_text_file(PROJECT_HOOK_PATH)
+    current_settings = load_json_file(user_paths["settings"])
+    current_mcp = load_json_file(user_paths["mcp"])
+    current_hook_text = load_text_file(user_paths["hook_script"])
+
+    hook_registered = settings_have_hook_command(current_settings, expected_hook_command)
+    mcp_matches = current_mcp == expected_mcp if user_paths["mcp"].exists() else False
+    hook_file_matches = current_hook_text == expected_hook_text if user_paths["hook_script"].exists() else False
+
+    missing = []
+    if not mcp_matches:
+        missing.append("mcp_json")
+    if not hook_registered:
+        missing.append("claude_settings_hook")
+    if not hook_file_matches:
+        missing.append("hook_script")
+
+    ready = not missing
+    return {
+        "root": str(user_paths["root"]),
+        "settings_json": str(user_paths["settings"]),
+        "mcp_json": str(user_paths["mcp"]),
+        "hook_script": str(user_paths["hook_script"]),
+        "settings_exists": user_paths["settings"].exists(),
+        "mcp_exists": user_paths["mcp"].exists(),
+        "hook_exists": user_paths["hook_script"].exists(),
+        "mcp_matches_expected": mcp_matches,
+        "hook_registered": hook_registered,
+        "hook_file_matches_expected": hook_file_matches,
+        "ready": ready,
+        "missing_or_outdated": missing,
+        "recommended_command": "" if ready else build_user_preview_command(user_paths["root"]),
+    }
+
+
+def collect_install_status(override_workspace: str = "") -> dict[str, Any]:
+    workspace_paths = get_workspace_paths(override_workspace)
+    user_paths = get_user_claude_paths()
+    project_status = collect_project_status(workspace_paths)
+    user_status = collect_user_status(user_paths)
+    recommended_next_command = project_status["recommended_command"] or user_status["recommended_command"]
+    human_summary = "项目级 CodeCGC 集成已就绪。"
+    if not project_status["ready"]:
+        human_summary = "项目级 CodeCGC 集成尚未就绪。"
+    elif not user_status["ready"]:
+        human_summary = "项目级集成已就绪；用户级 Claude 集成仍是可选项，当前尚未就绪。"
+    status_summary = {
+        "project_ready": project_status["ready"],
+        "user_ready": user_status["ready"],
+        "default_policy": "project-local-first",
+        "recommended_next_command": recommended_next_command,
+        "recommended_project_command": project_status["recommended_command"],
+        "recommended_user_command": user_status["recommended_command"],
+        "human_summary": human_summary,
+        "scope": "项目级集成就绪状态，以及用户级 Claude 集成预演状态",
+    }
+
+    return {
+        "success": True,
+        "mode": "status",
+        "workspace": str(workspace_paths["root"]),
+        "summary": status_summary,
+        "status_summary": status_summary,
+        "project": project_status,
+        "user_preview_targets": user_status,
+    }
+
+
+def find_python_command() -> str:
+    candidates = ["python", "py"] if os.name == "nt" else ["python3", "python"]
+    for candidate in candidates:
+        if shutil.which(candidate):
+            return candidate
+    return ""
+
+
+def probe_python_import(runtime_command: str, module_name: str, runtime_env: dict[str, str]) -> dict[str, Any]:
+    try:
+        result = subprocess.run(
+            [runtime_command, "-c", f"import {module_name}; print('ok')"],
+            cwd=WORKSPACE,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=runtime_env,
+        )
+    except Exception as error:
+        return {
+            "ok": False,
+            "detail": str(error),
+            "error_type": type(error).__name__,
+            "stdout": "",
+            "stderr": "",
+            "returncode": None,
+        }
+
+    stdout_text = (result.stdout or "").strip()
+    stderr_text = (result.stderr or "").strip()
+    return {
+        "ok": result.returncode == 0 and stdout_text == "ok",
+        "detail": stdout_text if result.returncode == 0 and stdout_text == "ok" else stderr_text or stdout_text or f"returncode={result.returncode}",
+        "error_type": "",
+        "stdout": stdout_text,
+        "stderr": stderr_text,
+        "returncode": result.returncode,
+    }
+
+
+def build_pip_install_command(python_command: str, requirement: str) -> str:
+    runtime_command = python_command.strip() or sys.executable
+    return f"{shell_quote(runtime_command)} -m pip install {shell_quote(requirement)}"
+
+
+def build_local_editable_install_command(python_command: str) -> str:
+    runtime_command = python_command.strip() or sys.executable
+    codexmcp_path = WORKSPACE / "codexmcp"
+    geminimcp_path = WORKSPACE / "geminimcp"
+    if not (codexmcp_path / "pyproject.toml").exists():
+        return ""
+    if not (geminimcp_path / "pyproject.toml").exists():
+        return ""
+    return (
+        f"{shell_quote(runtime_command)} -m pip install -e {shell_quote(str(codexmcp_path))} "
+        f"-e {shell_quote(str(geminimcp_path))}"
+    )
+
+
+def classify_doctor_failures(
+    checks: list[dict[str, Any]],
+    configured_python_command: str,
+    workspace_root: Path,
+) -> tuple[list[dict[str, str]], list[str]]:
+    failure_categories: list[dict[str, str]] = []
+    recommended_commands: list[str] = []
+    seen_codes: set[str] = set()
+    seen_commands: set[str] = set()
+
+    def add_failure(code: str, summary: str, suggestion: str, command: str = "") -> None:
+        if code in seen_codes:
+            return
+        seen_codes.add(code)
+        failure_categories.append(
+            {
+                "code": code,
+                "summary": summary,
+                "suggestion": suggestion,
+            }
+        )
+        if command and command not in seen_commands:
+            seen_commands.add(command)
+            recommended_commands.append(command)
+
+    runtime_command = configured_python_command.strip() or sys.executable
+    install_command = build_doctor_fix_command(workspace_root)
+    editable_install_command = build_local_editable_install_command(runtime_command)
+    failed_names = {
+        str(item.get("name", "")).strip()
+        for item in checks
+        if isinstance(item, dict) and not item.get("ok")
+    }
+    configured_python_missing = "configured_python_command_exists" in failed_names
+
+    for item in checks:
+        if not isinstance(item, dict) or item.get("ok"):
+            continue
+        name = str(item.get("name", "")).strip()
+        detail = str(item.get("detail", "")).strip()
+
+        if name == "python_available":
+            add_failure(
+                "python-unavailable",
+                "系统 PATH 中没有找到可用 Python 命令。",
+                "先安装 Python 3.12+，并确保 `python` 或 `py` 可在命令行直接调用。",
+            )
+            continue
+
+        if name == "configured_python_command_exists":
+            add_failure(
+                "configured-python-missing",
+                "配置的 Python 解释器不存在或不可执行。",
+                "检查 `CODECGC_PYTHON_COMMAND` 是否指向正确解释器，或者移除该变量后重试。",
+            )
+            continue
+
+        if name == "python_runtime_import_probe_mcp":
+            if configured_python_missing:
+                continue
+            add_failure(
+                "mcp-runtime-missing",
+                "当前 Python 环境缺少 `mcp` 运行时依赖。",
+                "在当前解释器下安装 MCP CLI 依赖后重新执行 doctor。",
+                build_pip_install_command(runtime_command, MCP_RUNTIME_REQUIREMENT),
+            )
+            continue
+
+        if name == "python_runtime_import_probe_codexmcp":
+            if configured_python_missing:
+                continue
+            if "No module named 'codexmcp'" in detail or 'No module named "codexmcp"' in detail:
+                add_failure(
+                    "codexmcp-package-missing",
+                    "当前解释器无法导入本地 `codexmcp` 包。",
+                    "确认当前安装包已包含 `codexmcp/src`；仓库开发环境可执行本地 editable install，安装产物则应重新安装 CodeCGC 包。",
+                    editable_install_command,
+                )
+            else:
+                add_failure(
+                    "codexmcp-runtime-broken",
+                    "`codexmcp` 启动入口存在，但当前运行时仍无法导入。",
+                    "仓库开发环境可先重装本地执行器包；若你使用的是已安装产物，则优先重新安装 CodeCGC，再检查执行器源码是否缺失或损坏。",
+                    editable_install_command,
+                )
+            continue
+
+        if name == "python_runtime_import_probe_geminimcp":
+            if configured_python_missing:
+                continue
+            if "No module named 'geminimcp'" in detail or 'No module named "geminimcp"' in detail:
+                add_failure(
+                    "geminimcp-package-missing",
+                    "当前解释器无法导入本地 `geminimcp` 包。",
+                    "确认当前安装包已包含 `geminimcp/src`；仓库开发环境可执行本地 editable install，安装产物则应重新安装 CodeCGC 包。",
+                    editable_install_command,
+                )
+            else:
+                add_failure(
+                    "geminimcp-runtime-broken",
+                    "`geminimcp` 启动入口存在，但当前运行时仍无法导入。",
+                    "仓库开发环境可先重装本地执行器包；若你使用的是已安装产物，则优先重新安装 CodeCGC，再检查执行器源码是否缺失或损坏。",
+                    editable_install_command,
+                )
+            continue
+
+        if name == "project_integration_ready":
+            add_failure(
+                "project-integration-missing",
+                "项目级 Claude 集成面未就绪。",
+                "重新执行项目级安装以同步 `.mcp.json`、hook 与 Claude settings。",
+                install_command,
+            )
+            continue
+
+        if name in {"routing_file_exists", "project_hook_source_exists"}:
+            add_failure(
+                "packaged-runtime-missing-files",
+                "运行时所需的路由文件或 hook 源文件缺失。",
+                "检查当前安装包是否完整，必要时重新安装或重新打包后再试。",
+            )
+            continue
+
+    return failure_categories, recommended_commands
+
+
+def collect_doctor_status(override_workspace: str = "") -> dict[str, Any]:
+    workspace_paths = get_workspace_paths(override_workspace)
+    project_status = collect_project_status(workspace_paths)
+    registry = build_executor_registry()
+    python_command = find_python_command()
+    configured_python_command = resolve_python_command()
+
+    checks: list[dict[str, Any]] = [
+        {
+            "name": "workspace_root_exists",
+            "ok": workspace_paths["root"].exists(),
+            "detail": str(workspace_paths["root"]),
+        },
+        {
+            "name": "python_available",
+            "ok": bool(python_command),
+            "detail": python_command or "python-not-found",
+        },
+        {
+            "name": "configured_python_command_exists",
+            "ok": Path(configured_python_command).exists() if Path(configured_python_command).is_absolute() else bool(shutil.which(configured_python_command)),
+            "detail": configured_python_command,
+        },
+        {
+            "name": "routing_file_exists",
+            "ok": workspace_paths["routing_file"].exists(),
+            "detail": str(workspace_paths["routing_file"]),
+        },
+        {
+            "name": "project_hook_source_exists",
+            "ok": PROJECT_HOOK_PATH.exists(),
+            "detail": str(PROJECT_HOOK_PATH),
+        },
+    ]
+
+    for target, config in registry.items():
+        pythonpath = Path(str(config["pythonpath"]))
+        module_path = pythonpath / Path(str(config["python_module"]).replace(".", "/")).with_suffix(".py")
+        checks.append(
+            {
+                "name": f"{target}_pythonpath_exists",
+                "ok": pythonpath.exists(),
+                "detail": str(pythonpath),
+            }
+        )
+        checks.append(
+            {
+                "name": f"{target}_entry_module_exists",
+                "ok": module_path.exists(),
+                "detail": str(module_path),
+            }
+        )
+
+    runtime_probe_command = configured_python_command if configured_python_command else (python_command or sys.executable)
+    runtime_env = dict(os.environ)
+    combined_pythonpath = os.pathsep.join([str(WORKSPACE / "codexmcp" / "src"), str(WORKSPACE / "geminimcp" / "src")])
+    existing_pythonpath = runtime_env.get("PYTHONPATH", "").strip()
+    runtime_env["PYTHONPATH"] = f"{combined_pythonpath}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else combined_pythonpath
+
+    for module_name in ("mcp", "codexmcp.cli", "geminimcp.cli"):
+        probe = probe_python_import(runtime_probe_command, module_name, runtime_env)
+        checks.append(
+            {
+                "name": f"python_runtime_import_probe_{module_name.split('.')[0]}",
+                "ok": probe["ok"],
+                "detail": probe["detail"],
+                "module": module_name,
+                "returncode": probe["returncode"],
+                "stderr": probe["stderr"],
+                "stdout": probe["stdout"],
+                "error_type": probe["error_type"],
+            }
+        )
+
+    checks.append(
+        {
+            "name": "project_integration_ready",
+            "ok": bool(project_status["ready"]),
+            "detail": ", ".join(project_status["missing_or_outdated"]) or "ready",
+        }
+    )
+
+    failed = [item["name"] for item in checks if not item["ok"]]
+    ready = not failed
+    failure_categories, recommended_runtime_fix_commands = classify_doctor_failures(
+        checks,
+        configured_python_command,
+        workspace_paths["root"],
+    )
+    human_summary = "CodeCGC 自检通过。"
+    if not ready:
+        human_summary = "CodeCGC 自检发现运行前置或集成面存在缺失。"
+    doctor_summary = {
+        "ready": ready,
+        "failed_checks": failed,
+        "human_summary": human_summary,
+        "scope": "运行前置、执行器可导入性，以及项目级集成就绪状态",
+        "recommended_fix_command": "" if ready else build_doctor_fix_command(workspace_paths["root"]),
+        "recommended_runtime_fix_command": "" if not recommended_runtime_fix_commands else recommended_runtime_fix_commands[0],
+        "recommended_runtime_fix_commands": recommended_runtime_fix_commands,
+        "failure_categories": failure_categories,
+    }
+
+    return {
+        "success": True,
+        "mode": "doctor",
+        "workspace": str(workspace_paths["root"]),
+        "summary": doctor_summary,
+        "doctor_summary": doctor_summary,
+        "checks": checks,
+        "project": project_status,
+        "python": {
+            "current_executable": sys.executable,
+            "discovered_command": python_command,
+            "configured_command": configured_python_command,
+        },
+    }
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Install or inspect CodeCGC integration surfaces.")
+    parser.add_argument("--mode", choices=["local", "user-dry-run", "user", "status", "doctor"], default="local")
+    parser.add_argument(
+        "--format",
+        choices=["json", "summary"],
+        default="summary",
+        help="Output format. Summary is the default product-facing mode; use json for debugging or automation.",
+    )
+    parser.add_argument(
+        "--workspace",
+        default="",
+        help="Optional target workspace root for local/status modes. Defaults to the current CodeCGC repository root.",
+    )
+    parser.add_argument("--user-root", default="", help="Optional explicit Claude user root for user/user-dry-run modes.")
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.mode == "local":
+        result = install_local_runtime(args.workspace)
+    elif args.mode == "user-dry-run":
+        result = preview_user_install(args.user_root)
+    elif args.mode == "user":
+        result = install_user_runtime(args.user_root)
+    elif args.mode == "status":
+        result = collect_install_status(args.workspace)
+    elif args.mode == "doctor":
+        result = collect_doctor_status(args.workspace)
+    else:
+        raise ValueError(f"Unsupported install mode: {args.mode}")
+
+    if args.mode == "status" and args.format == "summary":
+        summary = result.get("summary", {}) if isinstance(result.get("summary"), dict) else {}
+        project = result.get("project", {}) if isinstance(result.get("project"), dict) else {}
+        user = result.get("user_preview_targets", {}) if isinstance(result.get("user_preview_targets"), dict) else {}
+        lines = [
+            f"- 工作区: {result.get('workspace', '')}",
+            f"- 范围: {summary.get('scope', '')}",
+            f"- 项目级就绪: {'是' if summary.get('project_ready') else '否'}",
+            f"- 用户级就绪: {'是' if summary.get('user_ready') else '否'}",
+            f"- 策略: {summary.get('default_policy', '')}",
+            f"- 摘要: {summary.get('human_summary', '')}",
+            f"- 项目缺失项: {', '.join(project.get('missing_or_outdated', [])) or '无'}",
+            f"- 用户缺失项: {', '.join(user.get('missing_or_outdated', [])) or '无'}",
+        ]
+        recommended_project = str(summary.get("recommended_project_command", "")).strip()
+        recommended_user = str(summary.get("recommended_user_command", "")).strip()
+        recommended_next = str(summary.get("recommended_next_command", "")).strip()
+        next_actions = [item for item in [recommended_next, recommended_project, recommended_user] if item]
+        print(render_summary_block("CodeCGC 安装状态", lines, next_actions))
+        return 0 if result.get("success") else 1
+
+    if args.mode == "doctor" and args.format == "summary":
+        summary = result.get("summary", {}) if isinstance(result.get("summary"), dict) else {}
+        checks = result.get("checks", []) if isinstance(result.get("checks"), list) else []
+        lines = [
+            f"- 工作区: {result.get('workspace', '')}",
+            f"- 范围: {summary.get('scope', '')}",
+            f"- 就绪: {'是' if summary.get('ready') else '否'}",
+            f"- 摘要: {summary.get('human_summary', '')}",
+        ]
+        failed_checks = summary.get("failed_checks", [])
+        lines.append(f"- 失败检查项: {', '.join(str(item) for item in failed_checks) or '无'}")
+        failure_categories = summary.get("failure_categories", [])
+        for item in failure_categories:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"- 失败分类 {item.get('code', '')}: {item.get('summary', '')} | {item.get('suggestion', '')}"
+            )
+        for item in checks:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"- 检查 {item.get('name', '')}: {'通过' if item.get('ok') else '失败'} ({item.get('detail', '')})"
+            )
+        fix_command = str(summary.get("recommended_fix_command", "")).strip()
+        runtime_fix_command = str(summary.get("recommended_runtime_fix_command", "")).strip()
+        next_actions = [item for item in [runtime_fix_command, fix_command] if item]
+        print(render_summary_block("CodeCGC Doctor", lines, next_actions))
+        return 0 if result.get("success") else 1
+
+    if args.format == "summary" and args.mode in {"local", "user-dry-run", "user"}:
+        print(build_install_mode_summary(result))
+        return 0 if result.get("success") else 1
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result.get("success") else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

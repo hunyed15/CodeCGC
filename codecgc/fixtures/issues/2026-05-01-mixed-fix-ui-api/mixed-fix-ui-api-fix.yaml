@@ -1,0 +1,43 @@
+issue: 2026-05-01-mixed-fix-ui-api
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Apply one frontend fix step"
+    exit_signal: "Fix step is ready for delegated execution"
+    status: pending
+    codecgc:
+      kind: frontend
+      task_id: mixed-fix-ui-api-fix-step-1
+      task_summary: "Apply only the approved frontend fix in src/components/LoginForm.tsx."
+      target_paths:
+        - src/components/LoginForm.tsx
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动后端 API。
+      acceptance:
+        - Frontend validation bug is fixed.
+      cd: .
+  - action: "Apply one backend fix step"
+    exit_signal: "Fix step is ready for delegated execution"
+    status: pending
+    codecgc:
+      kind: backend
+      task_id: mixed-fix-ui-api-fix-step-2
+      task_summary: "Apply only the approved backend fix in backend/src/sync.py."
+      target_paths:
+        - backend/src/sync.py
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动前端 UI 行为。
+      acceptance:
+        - Backend sync retry bug is fixed.
+      cd: .
+
+checks:
+  - item: "Mixed or shared scope must be split first"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

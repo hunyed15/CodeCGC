@@ -1,0 +1,28 @@
+feature: 2026-05-02-entry-review-ready-demo
+artifact_class: fixture
+created: 2026-05-02
+
+steps:
+  - action: "定义一个可执行的前端功能开发步骤"
+    exit_signal: "步骤契约已经可以进入委派执行"
+    status: done
+    codecgc:
+      kind: frontend
+      task_id: entry-review-ready-demo-step-1
+      task_summary: "Implement only the approved frontend step in src/components/EntryReviewReady.tsx."
+      target_paths:
+        - src/components/EntryReviewReady.tsx
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动后端 API。
+      acceptance:
+        - Entry review-ready demo is implemented.
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

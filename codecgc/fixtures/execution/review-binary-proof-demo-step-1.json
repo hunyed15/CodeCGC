@@ -1,0 +1,77 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "execute",
+  "timestamp": "2026-05-03T10:30:00+00:00",
+  "task_id": "review-binary-proof-demo-step-1",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "assets/review-binary-proof-demo.png"
+  ],
+  "route_notes": [
+    "assets/review-binary-proof-demo.png -> frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-03-review-binary-proof-demo\\review-binary-proof-demo-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_slug": "2026-05-03-review-binary-proof-demo",
+    "step_number": 1,
+    "step_action": "Implement one frontend non-text diff-proof feature step",
+    "artifact_class": "fixture"
+  },
+  "task_summary": "Implement only the approved non-text diff-proof demo step in assets/review-binary-proof-demo.png.",
+  "constraints": [
+    "Do not edit files outside target_paths.",
+    "Do not change backend APIs."
+  ],
+  "acceptance_criteria": [
+    "Binary review proof demo asset is updated."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "review-binary-proof-demo-step-1",
+    "session_id": "",
+    "summary": "Binary review proof demo asset was updated.",
+    "changed_files": [
+      "assets/review-binary-proof-demo.png"
+    ],
+    "policy_checks": [],
+    "risks": [],
+    "error": ""
+  },
+  "file_evidence": {
+    "evidence_source": "workspace-unified-diff-snapshot",
+    "workspace_changed_files": [
+      "assets/review-binary-proof-demo.png"
+    ],
+    "verified_changed_files": [
+      "assets/review-binary-proof-demo.png"
+    ],
+    "out_of_scope_changed_files": [],
+    "file_diffs": [
+      {
+        "path": "assets/review-binary-proof-demo.png",
+        "change_type": "modified",
+        "before_hash": "binary-before-hash",
+        "after_hash": "binary-after-hash",
+        "before_size": 1048,
+        "after_size": 1584,
+        "before_preview": "[non-text-or-unreadable]",
+        "after_preview": "[non-text-or-unreadable]",
+        "diff_excerpt": "",
+        "diff_kind": "binary-or-unreadable",
+        "changed_line_count": 0,
+        "in_scope": true,
+        "scope_match_kind": "exact",
+        "matched_target": "assets/review-binary-proof-demo.png"
+      }
+    ],
+    "evidence_confidence": "local-nontext-diff-verified"
+  }
+}

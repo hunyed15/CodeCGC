@@ -1,0 +1,53 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "execute",
+  "timestamp": "2026-05-02T09:42:53.011607+00:00",
+  "task_id": "entry-executor-failure-demo-step-1",
+  "target": "backend",
+  "tool_name": "implement_backend_task",
+  "target_paths": [
+    "backend/src/executor_failure_demo.py"
+  ],
+  "route_notes": [
+    "backend/src/executor_failure_demo.py -> forced:backend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-02-entry-executor-failure-demo\\entry-executor-failure-demo-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_class": "fixture",
+    "artifact_slug": "2026-05-02-entry-executor-failure-demo",
+    "step_number": 1,
+    "step_action": "Implement one frontend executor-failure feature step"
+  },
+  "task_summary": "Implement only the approved backend step in backend/src/executor_failure_demo.py.",
+  "constraints": [
+    "Do not edit files outside target_paths."
+  ],
+  "acceptance_criteria": [
+    "The fixture should be usable for executor-side failure-path validation."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": false,
+    "outcome": "executor-failure",
+    "task_id": "entry-executor-failure-demo-step-1",
+    "session_id": "",
+    "summary": "",
+    "changed_files": [
+      "backend/src/executor_failure_demo.py"
+    ],
+    "policy_checks": [],
+    "risks": [],
+    "error": ""
+  },
+  "file_evidence": {
+    "evidence_source": "workspace-snapshot",
+    "workspace_changed_files": [],
+    "verified_changed_files": [],
+    "out_of_scope_changed_files": []
+  }
+}

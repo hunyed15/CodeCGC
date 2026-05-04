@@ -1,0 +1,32 @@
+feature: 2026-05-01-2026-05-01-roadmap-child-init-backend-track
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Define one executable step"
+    exit_signal: "步骤契约已经可以进入委派执行"
+    status: pending
+    codecgc:
+      kind: backend
+      task_id: 2026-05-01-roadmap-child-init-backend-track-step-1
+      task_summary: "Implement the approved step only."
+      target_paths:
+        - backend/api/child-a.ts
+        - backend/api/child-b.ts
+        - backend/api/child-c.ts
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动前端 UI 行为。
+      acceptance:
+        - Return a structured execution result.
+        - Changed files stay inside target_paths.
+        - Backend behavior change stays within the scoped fix or feature step.
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

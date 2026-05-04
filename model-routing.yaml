@@ -1,0 +1,30 @@
+version: 1
+
+frontend_paths:
+  - "apps/web/**"
+  - "src/components/**"
+  - "src/pages/**"
+  - "src/app/**"
+  - "src/styles/**"
+  - "web/**"
+  - "frontend/**"
+
+backend_paths:
+  - "apps/api/**"
+  - "server/**"
+  - "src/server/**"
+  - "src/services/**"
+  - "src/repositories/**"
+  - "backend/**"
+
+shared_paths:
+  - "packages/shared/**"
+  - "src/shared/**"
+  - "src/lib/**"
+  - "src/types/**"
+
+rules:
+  frontend_executor: "geminimcp"
+  backend_executor: "codexmcp"
+  shared_policy: "split-first"
+  claude_role: "plan-review-accept-only"

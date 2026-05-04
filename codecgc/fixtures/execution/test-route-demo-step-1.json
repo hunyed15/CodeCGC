@@ -1,0 +1,66 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "real-run",
+  "timestamp": "2026-05-04T08:00:00+08:00",
+  "task_id": "test-route-demo-step-1",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "src/components/TestRouteDemo.tsx"
+  ],
+  "route_notes": [
+    "src/components/TestRouteDemo.tsx -> forced:frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-04-test-route-demo\\test-route-demo-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_class": "fixture",
+    "artifact_slug": "2026-05-04-test-route-demo",
+    "step_number": 1,
+    "step_action": "执行一个前端功能步骤"
+  },
+  "task_summary": "只在 src/components/TestRouteDemo.tsx 内实现已批准的前端步骤。",
+  "constraints": [
+    "不要修改 target_paths 之外的文件。",
+    "不要改动后端 API。"
+  ],
+  "acceptance_criteria": [
+    "组件可渲染。"
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "test-route-demo-step-1",
+    "session_id": "",
+    "summary": "Frontend implementation completed.",
+    "changed_files": [
+      "src/components/TestRouteDemo.tsx"
+    ],
+    "policy_checks": [],
+    "risks": [],
+    "error": "",
+    "split_suggestion": {}
+  },
+  "file_evidence": {
+    "evidence_source": "executor-self-report",
+    "workspace_changed_files": [],
+    "verified_changed_files": [],
+    "out_of_scope_changed_files": [],
+    "file_diffs": [],
+    "evidence_confidence": "reported-only",
+    "git_evidence": {
+      "git_repository_detected": false,
+      "git_root": "",
+      "history_available": false,
+      "status": "not-collected",
+      "tracked_changed_files": [],
+      "untracked_changed_files": [],
+      "git_changed_files": []
+    }
+  }
+}

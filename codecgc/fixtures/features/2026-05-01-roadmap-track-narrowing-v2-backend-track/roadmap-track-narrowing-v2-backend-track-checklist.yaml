@@ -1,0 +1,30 @@
+feature: 2026-05-01-roadmap-track-narrowing-v2-backend-track
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "定义一个可执行的后端功能开发步骤"
+    exit_signal: "步骤契约已经可以进入委派执行"
+    status: pending
+    codecgc:
+      kind: backend
+      task_id: roadmap-track-narrowing-v2-backend-track-step-1
+      task_summary: "Implement only the approved backend step in backend/api/track-narrow-v2-a.ts and 2 more path(s)."
+      target_paths:
+        - backend/api/track-narrow-v2-a.ts
+        - backend/api/track-narrow-v2-b.ts
+        - backend/api/track-narrow-v2-c.ts
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动前端 UI 行为。
+      acceptance:
+        - 后端：API 范围内的工作已按限定范围完成。
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

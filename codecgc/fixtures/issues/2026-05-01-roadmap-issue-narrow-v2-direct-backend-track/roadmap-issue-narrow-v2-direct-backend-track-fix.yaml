@@ -1,0 +1,29 @@
+issue: 2026-05-01-roadmap-issue-narrow-v2-direct-backend-track
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Apply one backend fix step"
+    exit_signal: "Fix step is ready for delegated execution"
+    status: pending
+    codecgc:
+      kind: backend
+      task_id: roadmap-issue-narrow-v2-direct-backend-track-fix-step-1
+      task_summary: "Apply only the approved backend fix in backend/api/issue-narrow-direct-a.ts and 1 more path(s)."
+      target_paths:
+        - backend/api/issue-narrow-direct-a.ts
+        - backend/api/issue-narrow-direct-b.ts
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动前端 UI 行为。
+      acceptance:
+        - Backend: regression is fixed and scoped.
+      cd: .
+
+checks:
+  - item: "Mixed or shared scope must be split first"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

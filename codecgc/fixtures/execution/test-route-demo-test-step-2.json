@@ -1,0 +1,73 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "dry-run",
+  "timestamp": "2026-05-04T02:47:05.352879+00:00",
+  "task_id": "test-route-demo-test-step-2",
+  "target": "frontend",
+  "tool_name": "implement_frontend_task",
+  "target_paths": [
+    "src/components/TestRouteDemo.test.tsx"
+  ],
+  "route_notes": [
+    "src/components/TestRouteDemo.test.tsx -> forced:frontend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-04-test-route-demo\\test-route-demo-checklist.yaml",
+    "artifact_type": "feature",
+    "artifact_class": "fixture",
+    "artifact_slug": "2026-05-04-test-route-demo",
+    "step_number": 2,
+    "step_action": "执行一个前端测试补充步骤"
+  },
+  "task_summary": "只补充当前已批准的功能开发前端测试步骤。",
+  "constraints": [
+    "不要修改测试范围外的业务文件。",
+    "不要新增后端 API 逻辑。"
+  ],
+  "acceptance_criteria": [
+    "返回结构化执行结果。",
+    "只补充或更新当前范围内的测试。",
+    "测试相关变更文件必须保持在 target_paths 范围内。",
+    "优先覆盖界面、交互或前端行为回归。"
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "requested_session_id": "",
+  "result": {
+    "success": true,
+    "outcome": "done",
+    "task_id": "test-route-demo-test-step-2",
+    "session_id": "",
+    "summary": "Dry run only. Task payload built but not executed.",
+    "changed_files": [
+      "src/components/TestRouteDemo.test.tsx"
+    ],
+    "policy_checks": [
+      "dry_run_only"
+    ],
+    "risks": [
+      "execution_not_performed"
+    ],
+    "error": "",
+    "split_suggestion": {}
+  },
+  "file_evidence": {
+    "evidence_source": "not-collected",
+    "workspace_changed_files": [],
+    "verified_changed_files": [],
+    "out_of_scope_changed_files": [],
+    "file_diffs": [],
+    "evidence_confidence": "unknown",
+    "git_evidence": {
+      "git_repository_detected": false,
+      "git_root": "",
+      "history_available": false,
+      "status": "not-collected",
+      "tracked_changed_files": [],
+      "untracked_changed_files": [],
+      "git_changed_files": []
+    }
+  }
+}

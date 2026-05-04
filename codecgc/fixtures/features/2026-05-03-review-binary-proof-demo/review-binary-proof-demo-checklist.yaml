@@ -1,0 +1,28 @@
+feature: 2026-05-03-review-binary-proof-demo
+artifact_class: fixture
+created: 2026-05-03
+
+steps:
+  - action: "定义一个可执行的非文本 diff 证据审核样例步骤"
+    exit_signal: "该步骤已具备带非文本本地证据的审核条件"
+    status: done
+    codecgc:
+      kind: frontend
+      task_id: review-binary-proof-demo-step-1
+      task_summary: "Implement only the approved non-text diff-proof demo step in assets/review-binary-proof-demo.png."
+      target_paths:
+        - assets/review-binary-proof-demo.png
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动后端 API。
+      acceptance:
+        - Binary review proof demo asset is updated.
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

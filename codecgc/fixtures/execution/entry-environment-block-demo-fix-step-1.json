@@ -1,0 +1,53 @@
+{
+  "product": "CodeCGC",
+  "version": 1,
+  "mode": "execute",
+  "timestamp": "2026-05-02T09:42:52.902909+00:00",
+  "task_id": "entry-environment-block-demo-fix-step-1",
+  "target": "backend",
+  "tool_name": "implement_backend_task",
+  "target_paths": [
+    "backend/missing/demo_timeout_target.py"
+  ],
+  "route_notes": [
+    "backend/missing/demo_timeout_target.py -> forced:backend"
+  ],
+  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "source": {
+    "type": "workflow-step",
+    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\issues\\2026-05-02-entry-environment-block-demo\\entry-environment-block-demo-fix.yaml",
+    "artifact_type": "issue",
+    "artifact_class": "fixture",
+    "artifact_slug": "2026-05-02-entry-environment-block-demo",
+    "step_number": 1,
+    "step_action": "Apply one missing-file backend fix step"
+  },
+  "task_summary": "Apply only the approved fix in backend/missing/demo_timeout_target.py.",
+  "constraints": [
+    "Do not edit files outside target_paths."
+  ],
+  "acceptance_criteria": [
+    "The missing target should surface an environment or tooling repair path."
+  ],
+  "cd": "D:\\Software\\VibeCoding\\CodeCGC\\missing\\workspace\\does-not-exist",
+  "requested_session_id": "",
+  "result": {
+    "success": false,
+    "outcome": "executor-failure",
+    "task_id": "entry-environment-block-demo-fix-step-1",
+    "session_id": "",
+    "summary": "",
+    "changed_files": [
+      "backend/missing/demo_timeout_target.py"
+    ],
+    "policy_checks": [],
+    "risks": [],
+    "error": ""
+  },
+  "file_evidence": {
+    "evidence_source": "workspace-snapshot",
+    "workspace_changed_files": [],
+    "verified_changed_files": [],
+    "out_of_scope_changed_files": []
+  }
+}

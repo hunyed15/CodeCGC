@@ -1,0 +1,28 @@
+feature: 2026-05-03-review-diff-proof-demo
+artifact_class: fixture
+created: 2026-05-03
+
+steps:
+  - action: "定义一个可执行的前端 diff 证据审核样例步骤"
+    exit_signal: "该步骤已具备带 unified diff 证据的审核条件"
+    status: done
+    codecgc:
+      kind: frontend
+      task_id: review-diff-proof-demo-step-1
+      task_summary: "Implement only the approved frontend diff-proof demo step in src/components/ReviewDiffProofDemo.tsx."
+      target_paths:
+        - src/components/ReviewDiffProofDemo.tsx
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+        - 不要改动后端 API。
+      acceptance:
+        - Frontend review diff-proof demo is implemented.
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending

@@ -1,0 +1,19 @@
+feature: 2026-05-01-closed-route-demo
+artifact_class: fixture
+created: 2026-05-01
+
+steps:
+  - action: "Closed state verification step"
+    exit_signal: "Accepted review already exists"
+    status: done
+    codecgc:
+      kind: frontend
+      task_id: closed-route-demo-step-1
+      task_summary: "Closed state verification only."
+      target_paths:
+        - src/components/ClosedRouteDemo.tsx
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+      acceptance:
+        - Accepted review already recorded.
+      cd: .

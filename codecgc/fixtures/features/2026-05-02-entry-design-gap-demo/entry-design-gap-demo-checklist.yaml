@@ -1,0 +1,27 @@
+feature: 2026-05-02-entry-design-gap-demo
+artifact_class: fixture
+created: 2026-05-02
+
+steps:
+  - action: "定义一个待补目标路径的功能开发步骤"
+    exit_signal: "步骤契约已经可以进入委派执行"
+    status: pending
+    codecgc:
+      kind: auto
+      task_id: entry-design-gap-demo-step-1
+      task_summary: "Implement only the approved feature step in docs/generated/UnknownSurface.ts."
+      target_paths:
+        - docs/generated/UnknownSurface.ts
+      constraints:
+        - 不要修改 target_paths 之外的文件。
+      acceptance:
+        - The unresolved path should force a routing design clarification.
+      cd: .
+
+checks:
+  - item: "共享或混合路径必须先拆分"
+    source: scope-guard
+    status: pending
+  - item: "一个执行器必须端到端负责这个执行步骤"
+    source: owner-guard
+    status: pending
