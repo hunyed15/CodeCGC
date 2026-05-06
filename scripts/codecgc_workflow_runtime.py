@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +26,11 @@ def parse_json_text(text: str) -> dict[str, Any]:
 
 def run_json_script(script_name: str, *args: str) -> dict[str, Any]:
     command = build_script_command(script_name, *args)
+
+    # 设置环境变量,确保子进程使用正确的工作目录
+    env = os.environ.copy()
+    env["CODECGC_WORKSPACE_ROOT"] = str(PROJECT_WORKSPACE)
+
     completed = subprocess.run(
         command,
         cwd=PROJECT_WORKSPACE,
@@ -33,6 +39,7 @@ def run_json_script(script_name: str, *args: str) -> dict[str, Any]:
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,  # 传递环境变量
     )
 
     stdout = completed.stdout.strip()
