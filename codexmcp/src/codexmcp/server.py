@@ -134,11 +134,12 @@ def _validate_backend_target_paths(target_paths: List[Path]) -> tuple[bool, List
     return True, policy_checks, ""
 
 
-def run_shell_command(cmd: list[str]) -> Generator[str, None, None]:
+def run_shell_command(cmd: list[str], cwd: Optional[Path] = None) -> Generator[str, None, None]:
     """Execute a command and stream its output line-by-line.
 
     Args:
         cmd: Command and arguments as a list (e.g., ["codex", "exec", "prompt"])
+        cwd: Optional working directory for the command
 
     Yields:
         Output lines from the command
@@ -157,6 +158,7 @@ def run_shell_command(cmd: list[str]) -> Generator[str, None, None]:
         stderr=subprocess.STDOUT,
         universal_newlines=True,
         encoding='utf-8',
+        cwd=str(cwd) if cwd else None,  # 添加 cwd 参数,确保在正确的工作目录中运行
     )
 
     output_queue: queue.Queue[str | None] = queue.Queue()
@@ -263,7 +265,7 @@ def _execute_codex_session(
     err_message = ""
     thread_id: Optional[str] = None
 
-    for line in run_shell_command(cmd):
+    for line in run_shell_command(cmd, cwd=cd):
         try:
             line_dict = json.loads(line.strip())
             all_messages.append(line_dict)
