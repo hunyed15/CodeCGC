@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import json
 import os
 import queue
@@ -359,13 +361,16 @@ async def gemini(
     ] = "",
 ) -> Dict[str, Any]:
     """Execute a gemini CLI session and return the results."""
-    return _execute_gemini_session(
-        prompt=PROMPT,
-        cd=cd,
-        sandbox=sandbox,
-        session_id=SESSION_ID,
-        return_all_messages=return_all_messages,
-        model=model,
+    return await asyncio.to_thread(
+        functools.partial(
+            _execute_gemini_session,
+            prompt=PROMPT,
+            cd=cd,
+            sandbox=sandbox,
+            session_id=SESSION_ID,
+            return_all_messages=return_all_messages,
+            model=model,
+        )
     )
 
 
@@ -433,13 +438,16 @@ async def implement_frontend_task(
         constraints=constraints,
         acceptance_criteria=acceptance_criteria,
     )
-    result = _execute_gemini_session(
-        prompt=prompt,
-        cd=cd,
-        sandbox=sandbox,
-        session_id=SESSION_ID,
-        return_all_messages=return_all_messages,
-        model=model,
+    result = await asyncio.to_thread(
+        functools.partial(
+            _execute_gemini_session,
+            prompt=prompt,
+            cd=cd,
+            sandbox=sandbox,
+            session_id=SESSION_ID,
+            return_all_messages=return_all_messages,
+            model=model,
+        )
     )
 
     if not result.get("success"):

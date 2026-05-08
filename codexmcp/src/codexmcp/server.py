@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import json
 import os
 import queue
@@ -134,12 +136,11 @@ def _validate_backend_target_paths(target_paths: List[Path]) -> tuple[bool, List
     return True, policy_checks, ""
 
 
-def run_shell_command(cmd: list[str], cwd: Optional[Path] = None) -> Generator[str, None, None]:
+def run_shell_command(cmd: list[str]) -> Generator[str, None, None]:
     """Execute a command and stream its output line-by-line.
 
     Args:
         cmd: Command and arguments as a list (e.g., ["codex", "exec", "prompt"])
-        cwd: Optional working directory for the command
 
     Yields:
         Output lines from the command
@@ -158,7 +159,6 @@ def run_shell_command(cmd: list[str], cwd: Optional[Path] = None) -> Generator[s
         stderr=subprocess.STDOUT,
         universal_newlines=True,
         encoding='utf-8',
-        cwd=str(cwd) if cwd else None,  # 添加 cwd 参数,确保在正确的工作目录中运行
     )
 
     output_queue: queue.Queue[str | None] = queue.Queue()
@@ -265,7 +265,7 @@ def _execute_codex_session(
     err_message = ""
     thread_id: Optional[str] = None
 
-    for line in run_shell_command(cmd, cwd=cd):
+    for line in run_shell_command(cmd):
         try:
             line_dict = json.loads(line.strip())
             all_messages.append(line_dict)
@@ -409,17 +409,20 @@ async def codex(
     ] = "",
 ) -> Dict[str, Any]:
     """Execute a Codex CLI session and return the results."""
-    return _execute_codex_session(
-        prompt=PROMPT,
-        cd=cd,
-        sandbox=sandbox,
-        session_id=SESSION_ID,
-        skip_git_repo_check=skip_git_repo_check,
-        return_all_messages=return_all_messages,
-        image=image,
-        model=model,
-        yolo=yolo,
-        profile=profile,
+    return await asyncio.to_thread(
+        functools.partial(
+            _execute_codex_session,
+            prompt=PROMPT,
+            cd=cd,
+            sandbox=sandbox,
+            session_id=SESSION_ID,
+            skip_git_repo_check=skip_git_repo_check,
+            return_all_messages=return_all_messages,
+            image=image,
+            model=model,
+            yolo=yolo,
+            profile=profile,
+        )
     )
 
 
@@ -495,17 +498,20 @@ async def implement_backend_task(
         constraints=constraints,
         acceptance_criteria=acceptance_criteria,
     )
-    result = _execute_codex_session(
-        prompt=prompt,
-        cd=cd,
-        sandbox=sandbox,
-        session_id=SESSION_ID,
-        skip_git_repo_check=True,
-        return_all_messages=return_all_messages,
-        image=[],
-        model=model,
-        yolo=False,
-        profile=profile,
+    result = await asyncio.to_thread(
+        functools.partial(
+            _execute_codex_session,
+            prompt=prompt,
+            cd=cd,
+            sandbox=sandbox,
+            session_id=SESSION_ID,
+            skip_git_repo_check=True,
+            return_all_messages=return_all_messages,
+            image=[],
+            model=model,
+            yolo=False,
+            profile=profile,
+        )
     )
 
     if not result.get("success"):
