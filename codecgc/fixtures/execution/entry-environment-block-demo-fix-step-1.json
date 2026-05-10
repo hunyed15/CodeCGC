@@ -12,10 +12,10 @@
   "route_notes": [
     "backend/missing/demo_timeout_target.py -> forced:backend"
   ],
-  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "routing_file": "model-routing.yaml",
   "source": {
     "type": "workflow-step",
-    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\issues\\2026-05-02-entry-environment-block-demo\\entry-environment-block-demo-fix.yaml",
+    "artifact_file": "codecgc/fixtures/issues/2026-05-02-entry-environment-block-demo/entry-environment-block-demo-fix.yaml",
     "artifact_type": "issue",
     "artifact_class": "fixture",
     "artifact_slug": "2026-05-02-entry-environment-block-demo",
@@ -29,7 +29,7 @@
   "acceptance_criteria": [
     "The missing target should surface an environment or tooling repair path."
   ],
-  "cd": "D:\\Software\\VibeCoding\\CodeCGC\\missing\\workspace\\does-not-exist",
+  "cd": "missing/workspace/does-not-exist",
   "requested_session_id": "",
   "result": {
     "success": false,

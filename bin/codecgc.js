@@ -12,11 +12,13 @@ const invokedBinary = (process.env.CODECGC_BIN_NAME || path.basename(process.arg
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const productVersion = packageJson.version || "0.0.0";
 const DIRECT_COMMANDS = new Set([
+  "start",
   "install",
   "status",
   "doctor",
   "package-audit",
   "external-audit",
+  "external-status",
   "release-readiness",
   "lifecycle",
   "history",
@@ -39,11 +41,13 @@ const helpText = `CodeCGC 命令入口
   cgc --request <text>
   cgc --latest
   cgc --slug <workflow-slug>
-  cgc-install [--mode local|user-dry-run|user|status|doctor] [--workspace <dir>] [--user-root <dir>]
+  cgc-start [--format json|summary] [--workspace <dir>]
+  cgc-install [--mode local|user-dry-run|user|status|doctor|start] [--workspace <dir>] [--user-root <dir>]
   cgc-status [--format json|summary]
   cgc-doctor [--format json|summary]
   cgc-package-audit [--format json|summary]
   cgc-external-audit [--format json|summary] [--workspace <dir>]
+  cgc-external-status [--format json|summary] [--workspace <dir>]
   cgc-release-readiness [--format json|summary] [--workspace <dir>]
   cgc-lifecycle [--format json|summary]
   cgc-history [--flow all|feature|issue] [--status all|open|closed] [--last <n>] [--format json|summary]
@@ -78,6 +82,8 @@ const helpText = `CodeCGC 命令入口
     cgc-route ...
   我想把 CodeCGC 安装或重新同步到当前项目
     cgc-install
+  我刚装完，想看当前项目下一步怎么开始
+    cgc-start
   我想知道集成面现在是否就绪
     cgc-status
   我想知道运行前置和执行器能不能真正启动
@@ -86,6 +92,8 @@ const helpText = `CodeCGC 命令入口
     cgc-package-audit
   我想确认第三方能力接入策略和本地 MCP 注册状态
     cgc-external-audit
+  我想快速查看第三方能力状态面板
+    cgc-external-status
   我想在发布或长期维护前跑一次总检查
     cgc-release-readiness
   我想快速判断当前仓库处于哪个生命周期阶段
@@ -98,11 +106,13 @@ const helpText = `CodeCGC 命令入口
     cgc-plan / cgc-build / cgc-fix / cgc-review / cgc-route
 
 命令职责:
+  cgc-start          显示当前项目的首次使用入口和下一步动作
   cgc-install        同步项目级或用户级集成面
   cgc-status         检查集成是否就绪，并给出下一步
   cgc-doctor         检查运行前置、执行器导入与项目集成状态
   cgc-package-audit  检查发布包是否覆盖运行时依赖
-  cgc-external-audit 检查外部能力白名单、接入状态与本地 MCP 观测结果
+  cgc-external-audit 检查外部能力白名单、接入声明与本地 MCP 观测一致性
+  cgc-external-status 查看外部能力状态面板与本地 MCP 观测结果
   cgc-release-readiness 汇总安装、运行时、发布包、外部接入与生命周期就绪状态
   cgc-lifecycle      汇总 roadmap、workflow 与 execution 的生命周期阶段
   cgc-history        只读汇总最近 feature / issue workflow 历史
@@ -117,9 +127,10 @@ const helpText = `CodeCGC 命令入口
 
 首次使用:
   1. 先在目标项目根目录执行 cgc-install
-  2. 再执行 cgc-status，必要时补 cgc-doctor
-  3. 然后直接使用 cgc "<自然语言需求>" 或 cgc-entry
-  4. 只有当你已经明确知道当前阶段时，再改用 cgc-plan / cgc-build / cgc-fix / cgc-test / cgc-review / cgc-route
+  2. 执行 cgc-start 查看项目本地入口说明
+  3. 再执行 cgc-status，必要时补 cgc-doctor
+  4. 然后直接使用 cgc "<自然语言需求>" 或 cgc-entry
+  5. 只有当你已经明确知道当前阶段时，再改用 cgc-plan / cgc-build / cgc-fix / cgc-test / cgc-review / cgc-route
 
 示例:
   cgc "新增一个登录页面，放在 src/components/LoginForm.tsx"
@@ -129,6 +140,7 @@ const helpText = `CodeCGC 命令入口
   cgc --request "现在下一步该做什么"
   cgc --latest
   cgc --slug 2026-05-01-demo-login-ui
+  cgc-start
   cgc-plan --flow feature --slug demo-login-ui --summary "Demo login UI feature" --target-path src/components/LoginForm.tsx --kind frontend
   cgc-build --slug 2026-05-01-demo-login-ui --step-number 1 --dry-run
   cgc-fix --slug 2026-05-01-demo-sync-bug --step-number 1 --dry-run
@@ -140,6 +152,7 @@ const helpText = `CodeCGC 命令入口
   cgc-status --format summary
   cgc-doctor --format summary
   cgc-package-audit --format summary
+  cgc-external-status --format summary
   cgc-external-audit --format summary
   cgc-release-readiness --format summary
   cgc-lifecycle --format summary
@@ -153,10 +166,36 @@ const helpText = `CodeCGC 命令入口
   CODECGC_WORKSPACE_ROOT  当当前 shell 目录不是目标项目根目录时，显式覆盖目标工作区
 `;
 
+const startHelpText = `CodeCGC Start
+
+用法:
+  cgc-start [--format <summary|json>] [--workspace <dir>]
+
+用途:
+  显示当前项目的首次使用入口、项目本地 onboarding 文件，以及下一步动作。
+
+默认行为:
+  不传 --format 时默认输出 summary，更适合安装后直接阅读。
+  该命令只读，不会修改项目文件。
+
+主要参数:
+  --workspace <dir>
+    显式指定目标项目根目录。默认使用当前 shell 所在目录。
+  --format <summary|json>
+    summary 用于新手入口摘要，json 用于调试或自动化消费。
+
+推荐用法:
+  cgc-install
+  cgc-start
+  cgc-status
+  cgc-doctor
+  cgc "新增一个登录页面，放在 src/components/LoginForm.tsx"
+`;
+
 const installHelpText = `CodeCGC 安装与自检
 
 用法:
-  cgc-install [--mode <local|user-dry-run|user|status|doctor>] [--workspace <dir>] [--user-root <dir>] [--format <json|summary>]
+  cgc-install [--mode <local|user-dry-run|user|status|doctor|start>] [--workspace <dir>] [--user-root <dir>] [--format <json|summary>]
 
 用途:
   准备、检查或修复 CodeCGC 在 Claude 与 MCP 启动链路上的集成面。
@@ -172,6 +211,8 @@ const installHelpText = `CodeCGC 安装与自检
     检查项目级集成是否就绪，并附带用户级集成预览状态。
   doctor
     检查运行前置、执行器可导入性，以及项目级集成是否就绪。
+  start
+    只读显示项目首次使用入口和下一步动作。
 
 主要参数:
   --workspace <dir>
@@ -183,12 +224,16 @@ const installHelpText = `CodeCGC 安装与自检
 
 推荐用法:
   cgc-install
+  cgc-start
   cgc-install --workspace D:\\Projects\\MyApp
+  cgc-install --mode start --format summary
   cgc-install --mode status --format summary
   cgc-install --mode doctor --format summary
   cgc-install --mode user-dry-run --user-root C:\\Users\\Admin\\.claude
 
 相关命令:
+  cgc-start
+    查看当前项目首次使用入口。
   cgc-status
     快速查看集成状态。
   cgc-doctor
@@ -227,6 +272,8 @@ const statusHelpText = `CodeCGC 安装状态
   cgc-status --format json
 
 相关命令:
+  cgc-start
+    查看当前项目首次使用入口。
   cgc-install
     同步或修复当前项目集成面。
   cgc-doctor
@@ -316,6 +363,30 @@ const externalAuditHelpText = `CodeCGC 外部能力审计
   cgc-external-audit
   cgc-external-audit --workspace D:\\Projects\\MyApp
   cgc-external-audit --format json
+`;
+
+const externalStatusHelpText = `CodeCGC 外部能力状态面板
+
+用法:
+  cgc-external-status [--format <summary|json>] [--workspace <dir>]
+
+用途:
+  快速查看外部能力登记状态、规划项与本地 MCP 观测结果。
+
+默认行为:
+  不传 --format 时默认输出 summary，更适合日常维护检查。
+  只有在需要查看完整结构化数据时才建议改用 --format json。
+
+主要参数:
+  --workspace <dir>
+    显式指定目标项目根目录。默认使用当前 shell 所在目录。
+  --format <summary|json>
+    summary 用于快速查看面板，json 用于调试和自动化消费。
+
+推荐用法:
+  cgc-external-status
+  cgc-external-status --workspace D:\\Projects\\MyApp
+  cgc-external-status --format json
 `;
 
 const releaseReadinessHelpText = `CodeCGC Release Readiness
@@ -594,22 +665,22 @@ const routeHelpText = `CodeCGC Workflow Route
 
 function findPython() {
   const override = (process.env.CODECGC_PYTHON_COMMAND || "").trim();
-  if (override) {
-    const probe = spawnSync(override, ["--version"], {
-      cwd: repoRoot,
-      encoding: "utf8",
-      shell: false,
-    });
-    if (probe.status === 0) {
-      return override;
+  const generatedMcpCommand = readGeneratedMcpPythonCommand();
+  for (const configured of [override, generatedMcpCommand]) {
+    if (configured) {
+      return configured;
     }
   }
-
-  const candidates = process.platform === "win32"
-    ? ["python", "py"]
-    : ["python3", "python"];
+  const candidates = [
+    ...(process.platform === "win32" ? ["python", "py"] : ["python3", "python"]),
+  ];
+  const seen = new Set();
 
   for (const command of candidates) {
+    if (seen.has(command)) {
+      continue;
+    }
+    seen.add(command);
     const probe = spawnSync(command, ["--version"], {
       cwd: repoRoot,
       encoding: "utf8",
@@ -620,6 +691,27 @@ function findPython() {
     }
   }
   return null;
+}
+
+function readGeneratedMcpPythonCommand() {
+  for (const mcpPath of [path.join(invocationCwd, ".mcp.json"), path.join(repoRoot, ".mcp.json")]) {
+    if (!existsSync(mcpPath)) {
+      continue;
+    }
+    try {
+      const payload = JSON.parse(readFileSync(mcpPath, "utf8"));
+      const servers = payload && payload.mcpServers;
+      if (servers && servers.codecgc && typeof servers.codecgc.command === "string") {
+        const command = servers.codecgc.command.trim();
+        if (command) {
+          return command;
+        }
+      }
+    } catch (_error) {
+      // Ignore malformed generated config and continue with normal Python discovery.
+    }
+  }
+  return "";
 }
 
 function run(command, commandArgs) {
@@ -1096,6 +1188,10 @@ function looksLikeEntryFlag(flag) {
   ]).has(flag);
 }
 
+function hasOption(argsList, optionName) {
+  return argsList.some((item) => item === optionName || item.startsWith(`${optionName}=`));
+}
+
 function shouldRouteRootInvocationToEntry(rawArgs) {
   if (rawArgs.length === 0) {
     return false;
@@ -1132,6 +1228,10 @@ function main() {
   }
 
   if (rest.length === 1 && (rest[0] === "--help" || rest[0] === "-h")) {
+    if (subcommand === "start") {
+      console.log(startHelpText);
+      return;
+    }
     if (subcommand === "install") {
       console.log(installHelpText);
       return;
@@ -1150,6 +1250,10 @@ function main() {
     }
     if (subcommand === "external-audit") {
       console.log(externalAuditHelpText);
+      return;
+    }
+    if (subcommand === "external-status") {
+      console.log(externalStatusHelpText);
       return;
     }
     if (subcommand === "release-readiness") {
@@ -1216,6 +1320,18 @@ function main() {
     return;
   }
 
+  if (subcommand === "start") {
+    run(
+      python,
+      [
+        path.join(repoRoot, "scripts", "install_codecgc.py"),
+        "--mode",
+        "start",
+        ...rest,
+      ],
+    );
+  }
+
   if (subcommand === "install") {
     run(python, [path.join(repoRoot, "scripts", "install_codecgc.py"), ...rest]);
   }
@@ -1242,12 +1358,17 @@ function main() {
     );
   }
 
-  if (subcommand === "external-audit") {
+  if (subcommand === "external-audit" || subcommand === "external-status") {
+    const view = subcommand === "external-status" ? "status" : "audit";
+    const commandArgs = [...rest];
+    if (!hasOption(commandArgs, "--view")) {
+      commandArgs.push("--view", view);
+    }
     run(
       python,
       [
         path.join(repoRoot, "scripts", "audit_codecgc_external_capabilities.py"),
-        ...rest,
+        ...commandArgs,
       ],
     );
   }

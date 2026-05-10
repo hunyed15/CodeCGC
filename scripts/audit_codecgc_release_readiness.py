@@ -1,5 +1,7 @@
 import argparse
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -8,14 +10,25 @@ from audit_codecgc_package_runtime import audit_package_runtime
 from codecgc_console_io import render_summary_block
 from install_codecgc import collect_doctor_status
 from install_codecgc import collect_install_status
+from install_codecgc import install_local_runtime
 
 WORKSPACE = Path(__file__).resolve().parents[1]
+RELEASE_PROBE_ROOT_ENV = "CODECGC_RELEASE_PROBE_ROOT"
 
 LIFECYCLE_REQUIRED_PATHS = [
+    "codecgc/reference/README.md",
     "codecgc/reference/lifecycle-map.md",
     "codecgc/reference/lifecycle-playbook.md",
+    "codecgc/reference/maintainer-guide.md",
+    "codecgc/reference/mcp-tool-surface.md",
     "codecgc/reference/operation-guide.md",
+    "codecgc/reference/onboarding.md",
+    "codecgc/reference/path-contract.md",
+    "codecgc/reference/quickstart.md",
+    "codecgc/reference/recovery-loop.md",
+    "codecgc/reference/real-workflow-loop.md",
     "codecgc/reference/release-maintenance-playbook.md",
+    "codecgc/reference/troubleshooting.md",
     "codecgc/reference/external-capability-registry.json",
     "codecgc/compound/codecgc-capability-matrix.md",
 ]
@@ -83,9 +96,44 @@ def collect_deploy_signals() -> dict[str, Any]:
     }
 
 
+def collect_install_probe(workspace_override: str = "") -> dict[str, Any]:
+    if str(workspace_override or "").strip():
+        install_status = collect_install_status(workspace_override)
+        doctor_status = collect_doctor_status(workspace_override)
+        return {
+            "mode": "target-workspace",
+            "workspace": str(install_status.get("workspace", "")),
+            "install_result": {},
+            "install_status": install_status,
+            "doctor_status": doctor_status,
+        }
+
+    probe_root_value = os.environ.get(RELEASE_PROBE_ROOT_ENV, "").strip()
+    probe_root = Path(probe_root_value).expanduser().resolve() if probe_root_value else None
+    if probe_root is not None:
+        probe_root.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(
+        prefix="codecgc-release-check-",
+        dir=str(probe_root) if probe_root is not None else None,
+        ignore_cleanup_errors=True,
+    ) as temp_dir:
+        install_result = install_local_runtime(temp_dir)
+        install_status = collect_install_status(temp_dir)
+        doctor_status = collect_doctor_status(temp_dir)
+        return {
+            "mode": "temporary-project-install",
+            "workspace": temp_dir,
+            "install_result": install_result,
+            "install_status": install_status,
+            "doctor_status": doctor_status,
+        }
+
+
 def audit_release_readiness(workspace_override: str = "") -> dict[str, Any]:
-    install_status = collect_install_status(workspace_override)
-    doctor_status = collect_doctor_status(workspace_override)
+    install_probe = collect_install_probe(workspace_override)
+    install_status = install_probe["install_status"]
+    doctor_status = install_probe["doctor_status"]
     package_audit = audit_package_runtime()
     external_audit = audit_external_capabilities(workspace_override)
     lifecycle_docs = audit_document_set(LIFECYCLE_REQUIRED_PATHS)
@@ -119,12 +167,14 @@ def audit_release_readiness(workspace_override: str = "") -> dict[str, Any]:
     return {
         "success": ready,
         "mode": "release-readiness-audit",
-        "workspace": str(install_status.get("workspace", "")),
+        "workspace": str(WORKSPACE),
         "summary": {
             "ready": ready,
             "scope": "release / maintenance / ops 就绪状态",
             "human_summary": human_summary,
             "recommended_next_action": recommended_next_action,
+            "install_probe_mode": install_probe["mode"],
+            "install_probe_workspace": install_probe["workspace"],
             "install_ready": install_ready,
             "doctor_ready": doctor_ready,
             "package_ready": package_ready,
@@ -134,6 +184,7 @@ def audit_release_readiness(workspace_override: str = "") -> dict[str, Any]:
             "deploy_signals_detected": deploy_signals["deploy_signals_detected"],
             "deploy_readiness_stage": deploy_signals["deploy_readiness_stage"],
         },
+        "install_probe": install_probe,
         "install_status": install_status,
         "doctor_status": doctor_status,
         "package_audit": package_audit,
@@ -152,6 +203,7 @@ def build_summary(result: dict[str, Any]) -> str:
     lines = [
         f"- 工作区: {result.get('workspace', '')}",
         f"- 范围: {summary.get('scope', '')}",
+        f"- 安装探针: {summary.get('install_probe_mode', '')} ({summary.get('install_probe_workspace', '')})",
         f"- 就绪: {'是' if summary.get('ready') else '否'}",
         f"- 摘要: {summary.get('human_summary', '')}",
         f"- 项目级集成: {'就绪' if summary.get('install_ready') else '未就绪'}",

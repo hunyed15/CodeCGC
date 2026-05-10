@@ -12,10 +12,10 @@
   "route_notes": [
     "src/components/EntryAwaitingReview.tsx -> forced:frontend"
   ],
-  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "routing_file": "model-routing.yaml",
   "source": {
     "type": "workflow-step",
-    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-02-entry-awaiting-review-demo\\entry-awaiting-review-demo-checklist.yaml",
+    "artifact_file": "codecgc/fixtures/features/2026-05-02-entry-awaiting-review-demo/entry-awaiting-review-demo-checklist.yaml",
     "artifact_type": "feature",
     "artifact_class": "fixture",
     "artifact_slug": "2026-05-02-entry-awaiting-review-demo",
@@ -30,7 +30,7 @@
   "acceptance_criteria": [
     "Entry awaiting-review demo is implemented."
   ],
-  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "cd": ".",
   "requested_session_id": "",
   "result": {
     "success": true,

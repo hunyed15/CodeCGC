@@ -12,10 +12,10 @@
   "route_notes": [
     "src/components/LoginForm.tsx -> frontend"
   ],
-  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "routing_file": "model-routing.yaml",
   "source": {
     "type": "workflow-step",
-    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-01-mixed-plan-ui-api\\mixed-plan-ui-api-checklist.yaml",
+    "artifact_file": "codecgc/fixtures/features/2026-05-01-mixed-plan-ui-api/mixed-plan-ui-api-checklist.yaml",
     "artifact_type": "feature",
     "artifact_slug": "2026-05-01-mixed-plan-ui-api",
     "step_number": 1,
@@ -30,7 +30,7 @@
   "acceptance_criteria": [
     "Frontend login form is updated."
   ],
-  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "cd": ".",
   "requested_session_id": "",
   "result": {
     "success": true,

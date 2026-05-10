@@ -9,6 +9,8 @@ from typing import Any
 from codecgc_artifact_roots import FIXTURE_ROOT
 from codecgc_artifact_roots import PRODUCT_ROOT
 from codecgc_console_io import render_summary_block
+from codecgc_path_contract import normalize_persisted_project_path
+from codecgc_path_contract import resolve_project_path
 from codecgc_runtime_paths import PROJECT_ROOT
 from route_codecgc_workflow import attach_route_summary
 from route_codecgc_workflow import route_feature
@@ -84,7 +86,7 @@ def locate_summary_file(flow: str, directory: Path) -> str:
     matches = sorted(directory.glob(f"*{suffix}"))
     if not matches:
         return ""
-    return str(matches[0].resolve())
+    return normalize_persisted_project_path(matches[0])
 
 
 def collect_history_record(flow: str, artifact_class: str, directory: Path) -> dict[str, Any]:
@@ -97,7 +99,8 @@ def collect_history_record(flow: str, artifact_class: str, directory: Path) -> d
     audit_path = str(route.get("audit_path", "")).strip()
     audit_timestamp = ""
     if audit_path:
-        audit_time = parse_iso_like_timestamp(Path(audit_path).stat().st_mtime_ns and datetime.fromtimestamp(Path(audit_path).stat().st_mtime).isoformat())
+        resolved_audit_path = resolve_project_path(audit_path)
+        audit_time = parse_iso_like_timestamp(resolved_audit_path.stat().st_mtime_ns and datetime.fromtimestamp(resolved_audit_path.stat().st_mtime).isoformat())
         if audit_time:
             audit_timestamp = audit_time.isoformat()
 
@@ -106,7 +109,7 @@ def collect_history_record(flow: str, artifact_class: str, directory: Path) -> d
         "artifact_class": artifact_class,
         "slug": slug,
         "created": extract_created_from_slug(slug),
-        "directory": str(directory.resolve()),
+        "directory": normalize_persisted_project_path(directory),
         "workflow_state": workflow_state,
         "state_label": STATE_LABELS.get(workflow_state, workflow_state or "未知"),
         "recommended_command": str(route.get("recommended_command", "")).strip(),
@@ -116,10 +119,10 @@ def collect_history_record(flow: str, artifact_class: str, directory: Path) -> d
         "current_task_id": str(summary.get("current_task_id", "")).strip(),
         "review_decision": str(summary.get("review_decision", "")).strip(),
         "is_closed": bool(summary.get("is_closed")),
-        "audit_path": audit_path,
+        "audit_path": normalize_persisted_project_path(audit_path) if audit_path else "",
         "audit_timestamp": audit_timestamp,
         "summary_file": locate_summary_file(flow, directory),
-        "root": str(artifact_root(artifact_class).resolve()),
+        "root": normalize_persisted_project_path(artifact_root(artifact_class)),
     }
     if current_step:
         record["current_step"] = {

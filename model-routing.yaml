@@ -1,4 +1,17 @@
-version: 1
+version: 2
+
+orchestration_paths:
+  - "codecgc/**"
+  - ".claude/commands/**"
+  - ".claude/settings.json"
+  - ".mcp.json"
+  - "model-routing.yaml"
+
+docs_paths:
+  - "README.md"
+  - "INSTALLATION.md"
+  - "docs/**"
+  - "CHANGELOG.md"
 
 frontend_paths:
   - "apps/web/**"
@@ -9,8 +22,6 @@ frontend_paths:
   - "web/**"
   - "frontend/**"
 
-custom_frontend_paths:
-
 backend_paths:
   - "apps/api/**"
   - "server/**"
@@ -19,7 +30,19 @@ backend_paths:
   - "src/repositories/**"
   - "backend/**"
 
-custom_backend_paths:
+test_paths:
+  frontend:
+    - "apps/web/*.test.*"
+    - "apps/web/*.spec.*"
+    - "apps/web/**/*.test.*"
+    - "apps/web/**/*.spec.*"
+    - "tests/frontend/**"
+  backend:
+    - "apps/api/*.test.*"
+    - "apps/api/*.spec.*"
+    - "apps/api/**/*.test.*"
+    - "apps/api/**/*.spec.*"
+    - "tests/backend/**"
 
 shared_paths:
   - "packages/shared/**"
@@ -28,7 +51,9 @@ shared_paths:
   - "src/types/**"
 
 rules:
-  frontend_executor: "geminimcp"
+  claude_allowed_owners:
+    - "orchestration"
+    - "docs"
   backend_executor: "codexmcp"
+  frontend_executor: "geminimcp"
   shared_policy: "split-first"
-  claude_role: "plan-review-accept-only"

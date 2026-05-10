@@ -1,204 +1,172 @@
-# CodeCGC Release v0.1.2
+# CodeCGC
 
-## 📦 发布内容
+CodeCGC 是一个以 Claude 为主控入口的多模型开发编排层，用于把需求、规划、执行、审查和验收拆成可控的协作流程。
 
-本目录包含 CodeCGC 项目的完整发布版本，已修复所有 P0/P1 优先级 bug，并完成核心优化。
+它的核心分工是：Claude 负责需求、规划、设计、文档、审查、验收和工作流状态；Codex 负责后端实现和后端测试；Gemini 负责前端实现和前端测试。CodeCGC 通过项目级路由策略和 Claude 写入拦截 hook 来约束这些边界。
 
-## 📋 版本信息
+## 工作模型
 
-- **版本号**: 0.1.2
-- **发布日期**: 2026-05-04
-- **Python 要求**: >= 3.10
-- **Node.js 要求**: >= 20.0.0
+推荐主路径：
 
-## 🎯 本版本修复内容
-
-### P0 - 正确性修复 ✅
-1. **路由逻辑错误** - `first_pending_step_is_not_executable` 硬编码检查 step 1
-2. **路径提取误匹配** - `extract_target_paths_from_request` 误匹配日期/版本号
-
-### P1 - 可用性改进 ✅
-3. **步骤状态自动更新** - Review 后自动更新 checklist 步骤状态
-4. **Per-step timeout** - 支持在 checklist 中为每个步骤指定超时时间
-
-### P2 - 效率优化 ✅
-5. **YAML 解析器替换** - 用 PyYAML 替换手写解析器，删除 ~180 行代码
-6. **测试覆盖** - 添加 30+ 单元测试，覆盖核心逻辑
-
-## 📚 文档
-
-- **[QUICKSTART.md](QUICKSTART.md)** - 5 分钟快速上手指南
-- **[INSTALLATION.md](INSTALLATION.md)** - 完整安装与配置文档
-- **[codecgc/architecture/code-audit-2026-05-04.md](codecgc/architecture/code-audit-2026-05-04.md)** - 代码审计报告
-
-## 🚀 快速开始
-
-### 1. 安装
-
-```bash
-# 从 npm 安装 CodeCGC
-npm install -g @hunyed15/codecgc --registry=https://registry.npmjs.org/
-
-# 安装 Python 依赖
-pip install pyyaml
-
-# 如自动集成未生效，可手动补执行
-cgc-install --mode user
+```text
+Claude /cgc -> CodeCGC MCP -> CodeCGC runtime -> Codex 或 Gemini 执行器
 ```
 
-全局安装完成后，CodeCGC 会尝试自动写入 Claude 用户级集成到 `~/.claude`，包括：
+CLI 仍然保留，用于本地调试、CI 检查和 MCP 不可用时的回退执行。普通用户优先使用 Claude 内的 `/cgc`，或在命令行使用 `cgc`，不需要记住所有内部子命令。
 
-- `~/.claude/mcp.json`
-- `~/.claude/hooks/route-edit.ps1`
-- `~/.claude/commands/cgc*.md` 自定义 slash commands
+## 安装
 
-当前安装链路还会注册 3 个 MCP server：
+全局安装 CLI：
 
-- `codecgc`：CodeCGC 编排器 MCP
-- `codex`：后端执行器 MCP
-- `gemini`：前端执行器 MCP
+```bash
+npm install -g @hunyed15/codecgc --registry=https://registry.npmjs.org/
+```
 
-安装完成后，可以在 Claude 中直接使用：
+全局安装只提供 `cgc*` 命令，不会默认写入用户级 Claude 配置。
 
-- `/cgc`
-- `/cgc-install`
-- `/cgc-status`
-- `/cgc-doctor`
-- `/cgc-plan`
-- `/cgc-build`
-- `/cgc-fix`
-- `/cgc-test`
-- `/cgc-review`
-- `/cgc-route`
-- `/cgc-history`
-- `/cgc-package-audit`
-- `/cgc-external-audit`
-- `/cgc-release-readiness`
-- `/cgc-lifecycle`
-
-当前这些 Claude commands 已调整为：
-
-- 优先走 `codecgc` MCP orchestrator
-- 只有在 MCP tool 路径不可用时，才回退到本地 CLI
-
-如果安装时 Python 尚未就绪，自动集成会跳过，此时可在安装 Python 后手动执行 `cgc-install --mode user`。
-
-### 2. 初始化项目
+然后在每个目标项目根目录执行项目级安装：
 
 ```bash
 cd your-project
 cgc-install
+cgc-start
+cgc-status
 cgc-doctor
 ```
 
-### 3. 开始使用
+在 Claude 中可以使用对应 slash command：
+
+```text
+/cgc-install
+/cgc-start
+/cgc-status
+/cgc-doctor
+```
+
+`/cgc-install` 和 `cgc-install` 默认都是项目级安装。它们会把集成文件写入当前项目，而不是写入 `~/.claude`。只有用户显式请求 user 模式时，才会处理用户级 Claude 集成。
+
+## 安装后生成的项目文件
+
+`cgc-install` 会在目标项目中创建或同步：
+
+```text
+.mcp.json
+model-routing.yaml
+.claude/
+  settings.json
+  hooks/
+    route-edit.ps1
+  commands/
+    cgc*.md
+codecgc/
+  START_HERE.md
+  features/
+  issues/
+  execution/
+  requirements/
+  architecture/
+  roadmap/
+  compound/
+  docs/
+  reference/
+  fixtures/
+```
+
+在 CodeCGC 源码仓库中，`.mcp.json`、`.claude/settings.json`、`.claude/commands/`、`codecgc/START_HERE.md` 以及实时 workflow 输出目录会被忽略，因为它们是机器相关或项目安装生成的内容。
+
+源码仓库会保留可发布运行时、参考文档、命令模板、测试 fixtures，以及 `.claude/hooks/route-edit.ps1` 这个 hook 模板。
+
+## 角色与路由策略
+
+`model-routing.yaml` 是文件归属和写入权限的唯一策略来源：
+
+- Claude 可以写 orchestration 和 docs 路径。
+- Codex 可以写 backend 源码和 backend 测试。
+- Gemini 可以写 frontend 源码和 frontend 测试。
+- shared 路径使用 `split-first` 策略，必须先拆分再执行。
+- unknown 路径默认拒绝，直到它被明确加入 `model-routing.yaml`。
+
+Claude hook 本身不承载业务逻辑。它只把 `Edit`、`Write`、`MultiEdit` 请求转发给 `scripts/codecgc_policy.py`，从而保证 hook 检查、任务构建和执行器派发使用同一套路由策略。
+
+## 文档放置规则
+
+普通项目文档放在 `docs/`，例如用户手册、API 文档、部署说明和 changelog。
+
+CodeCGC 工作流和治理产物放在 `codecgc/`：
+
+- `codecgc/docs/`：CodeCGC 生成的指南类文档。
+- `codecgc/reference/`：稳定契约、参考说明和工具文档。
+- `codecgc/requirements/`：长期需求沉淀。
+- `codecgc/architecture/`：架构说明和系统图谱。
+- `codecgc/roadmap/`：路线图和阶段计划。
+- `codecgc/features/`：功能计划、checklist 和验收记录。
+- `codecgc/issues/`：问题报告、分析和修复计划。
+- `codecgc/execution/`：执行器审计记录。
+
+## 日常使用
+
+在 Claude 中：
+
+```text
+/cgc 在 src/components/LoginForm.tsx 中新增登录页
+```
+
+在命令行中：
 
 ```bash
-cgc "新增用户登录功能"
+cgc "在 src/components/LoginForm.tsx 中新增登录页"
 ```
 
-详细步骤请参考 [QUICKSTART.md](QUICKSTART.md)
-
-## 📤 发布到 npm
-
-### 手动发布
+CodeCGC 会判断下一步应该是规划、执行、审查、继续还是关闭。只有当你已经明确知道当前阶段时，才需要直接使用子命令：
 
 ```bash
-npm login --registry=https://registry.npmjs.org/
-npm publish --access public --registry=https://registry.npmjs.org/
+cgc-plan ...
+cgc-build ...
+cgc-fix ...
+cgc-test ...
+cgc-review ...
+cgc-route ...
 ```
 
-### GitHub 自动发布
+## 健康检查
 
-本目录已包含 GitHub Actions 工作流：
-
-`/.github/workflows/publish-npm.yml`
-
-触发方式：
+对已经安装 CodeCGC 的目标项目：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-自动发布前提：
-
-- GitHub 仓库已启用 Actions
-- 仓库 Secrets 中已设置 `NPM_TOKEN`
-- tag 版本必须与 `package.json` 中的 `version` 完全一致
-
-建议流程：
-
-```bash
-# 1. 更新 package.json version
-# 2. 提交到 GitHub
-# 3. 打版本 tag
-git tag v0.1.0
-git push origin main --tags
-```
-
-## 📁 目录结构
-
-```
-release/
-├── README.md                    # 本文件
-├── QUICKSTART.md               # 快速开始指南
-├── INSTALLATION.md             # 完整安装文档
-├── package.json                # Node.js 包配置
-├── requirements.txt            # Python 核心依赖
-├── requirements-dev.txt        # Python 开发依赖
-├── pytest.ini                  # 测试配置
-├── model-routing.yaml          # 路由规则模板
-├── bin/                        # 命令行工具
-├── scripts/                    # Python 工作流脚本
-├── tests/                      # 单元测试
-├── codecgc/                    # 工作流产物模板
-├── codexmcp/                   # Codex MCP 服务器
-└── geminimcp/                  # Gemini MCP 服务器
-```
-
-## 🔧 依赖清单
-
-### Python 依赖
-
-**核心依赖**:
-- pyyaml>=6.0
-
-**开发依赖**:
-- pytest>=8.0.0
-- pytest-cov>=4.1.0
-
-### MCP 服务器
-
-1. **Codex MCP** - 后端代码执行器
-2. **Gemini MCP** - 前端代码执行器
-
-## ✅ 验证安装
-
-```bash
+cgc-status
 cgc-doctor
+cgc-external-status
+cgc-external-audit
 ```
 
-## 📝 更新日志
+维护或发布 CodeCGC 包时：
 
-### v0.1.0 (2026-05-04)
+```bash
+python -m pytest tests --basetemp D:\tmp\codecgc-pytest
+python -m compileall -q scripts codecgcmcp\src codexmcp\src geminimcp\src
+python scripts\audit_codecgc_package_runtime.py --format json
+python scripts\audit_codecgc_release_readiness.py --format json
+npm pack --dry-run --json
+```
 
-**修复**:
-- 修复路由逻辑错误
-- 修复路径提取误匹配
-- Review 后自动更新步骤状态
+`cgc-release-readiness` 会通过临时项目安装探针验证发布包可用性。源码仓库本身不需要提交项目级 `.mcp.json` 或 `.claude/settings.json`。
 
-**新增**:
-- Per-step timeout 支持
-- 30+ 单元测试
+如果运行环境限制默认临时目录写入，可以显式指定探针目录：
 
-**优化**:
-- 用 PyYAML 替换手写解析器
+```bash
+set CODECGC_RELEASE_PROBE_ROOT=D:\tmp
+python scripts\audit_codecgc_release_readiness.py --format json
+```
 
-## 📄 许可证
+## 参考文档
 
-MIT License
-
----
-
-**感谢使用 CodeCGC！**
+- [快速开始](codecgc/reference/quickstart.md)
+- [新手入口](codecgc/reference/onboarding.md)
+- [操作指南](codecgc/reference/operation-guide.md)
+- [真实工作流闭环](codecgc/reference/real-workflow-loop.md)
+- [失败恢复闭环](codecgc/reference/recovery-loop.md)
+- [故障排查](codecgc/reference/troubleshooting.md)
+- [路径契约](codecgc/reference/path-contract.md)
+- [路由策略](codecgc/reference/policy-routing.md)
+- [项目结构](codecgc/reference/project-structure.md)
+- [维护者指南](codecgc/reference/maintainer-guide.md)

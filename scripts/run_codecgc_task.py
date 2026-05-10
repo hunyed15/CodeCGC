@@ -14,6 +14,8 @@ from codecgc_executor_registry import build_executor_env
 from codecgc_executor_registry import get_executor_config
 from codecgc_file_evidence import snapshot_workspace
 from codecgc_file_evidence import verify_workspace_changes
+from codecgc_path_contract import normalize_audit_path_fields
+from codecgc_path_contract import normalize_persisted_project_path
 from codecgc_runtime_paths import PACKAGE_ROOT
 from codecgc_runtime_paths import PROJECT_ROOT
 from mcp import ClientSession
@@ -215,7 +217,7 @@ def build_audit_record(
     if not isinstance(reported_changed_files, list):
         reported_changed_files = []
 
-    return {
+    record = {
         "product": "CodeCGC",
         "version": 1,
         "mode": mode,
@@ -262,6 +264,7 @@ def build_audit_record(
             },
         },
     }
+    return normalize_audit_path_fields(record, PROJECT_WORKSPACE)
 
 
 def write_audit_file(audit_root: Path, audit_record: dict[str, Any]) -> Path:
@@ -379,7 +382,7 @@ async def run_task(args: argparse.Namespace) -> dict[str, Any]:
         "result": task_result,
         "audit": {
             "written": not args.skip_audit_write,
-            "path": str(audit_path) if audit_path else "",
+            "path": normalize_persisted_project_path(audit_path) if audit_path else "",
         },
     }
     return sanitize_for_json(output)

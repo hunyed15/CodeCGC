@@ -4,28 +4,26 @@
 
 这份文档是 CodeCGC 的本地使用实操指南。
 
-统一产品命令面是：
+CodeCGC 的推荐用户入口是 Claude 内的 `/cgc`，背后优先调用 CodeCGC orchestrator MCP 工具。
 
-- `cgc`
-- `cgc-install`
-- `cgc-entry`
-- `cgc-plan`
-- `cgc-build`
-- `cgc-fix`
-- `cgc-review`
-- `cgc-route`
-- `cgc-status`
-- `cgc-doctor`
-- `cgc-package-audit`
-- `cgc-external-audit`
-- `cgc-release-readiness`
-- `cgc-lifecycle`
+最小公开入口是：
+
+- `/cgc`
+- `/cgc-start`
+- `/cgc-install`
+- `/cgc-status`
+- `/cgc-doctor`
+- `/cgc-review`
+- `/cgc-history`
+
+CLI 命令继续保留，但主要用于本地调试、CI、维护和 MCP 不可用时的回退。
 
 底层实现入口如 `scripts/codecgc_cli.py`、`scripts/route_codecgc_workflow.py` 只属于维护者调试层。
 
 默认原则：
 
-- 日常使用优先走 `cgc-*`
+- 日常使用优先走 `/cgc` 或 `codecgc.entry`
+- 已明确 workflow 阶段时，才显式调用 `cgc-plan` / `cgc-build` / `cgc-fix` / `cgc-test` / `cgc-review`
 - 调试运行时本身时再看 Python 脚本入口
 
 ## 2. 首次接入顺序
@@ -33,13 +31,16 @@
 如果你是第一次把 CodeCGC 接入某个项目，建议顺序是：
 
 1. 在目标项目根目录运行 `cgc-install`
-2. 运行 `cgc-status`，必要时再运行 `cgc-doctor`
-3. 用 `cgc "<自然语言需求>"` 或 `cgc-entry` 开始
+2. 运行 `cgc-start` 查看项目本地首次使用入口
+3. 运行 `cgc-status`，必要时再运行 `cgc-doctor`
+4. 在 Claude 中用 `/cgc <自然语言需求>` 开始
+5. 如果不在 Claude 中，再用 `cgc "<自然语言需求>"` 作为 CLI 回退
 
 最小示例：
 
 ```bash
 cgc-install
+cgc-start
 cgc-status
 cgc "新增一个登录页面，放在 src/components/LoginForm.tsx"
 ```
@@ -58,8 +59,9 @@ cgc-status --workspace D:\Projects\MyApp
 - `cgc-plan`：还需要规划或澄清
 - `cgc-build` / `cgc-fix`：当前步骤已具备执行条件
 - `cgc-review`：已经存在 audit，等待审核决策
-- `cgc-route`：只想知道下一步推荐命令
-- `cgc-external-audit`：只想看外部能力接入状态
+- `cgc-route`：维护者只想知道下一步推荐命令
+- `cgc-external-status`：只想看外部能力状态面板
+- `cgc-external-audit`：只想看外部能力登记一致性与声明
 - `cgc-release-readiness`：发布或长期维护前做总检查
 - `cgc-lifecycle`：快速判断仓库现在处于哪个生命周期阶段
 
@@ -74,7 +76,9 @@ cgc --request "现在下一步该做什么"
 cgc --latest
 ```
 
-`cgc` 是意图优先入口，默认输出更适合人直接阅读的摘要。
+`cgc` 是 CLI 意图优先入口，默认输出更适合人直接阅读的摘要。
+
+在 Claude 中，优先使用 `/cgc`，让命令模板调用 `codecgc.entry` MCP 工具。
 
 如果需要完整结构化结果，使用：
 
@@ -182,12 +186,14 @@ cgc-route --flow feature --slug 2026-05-01-demo-login-ui
 1. `cgc-status`
 2. `cgc-doctor`
 3. `cgc-package-audit`
-4. `cgc-external-audit`
+4. `cgc-external-status`
+5. `cgc-external-audit`
 5. `cgc-release-readiness`
 6. `cgc-lifecycle`
 
 其中：
 
+- `cgc-external-status` 用来快速查看第三方能力状态面板
 - `cgc-external-audit` 用来判断第三方能力是否处于“正式接入 / 规划中 / 本地漂移”哪一种状态
 - `cgc-release-readiness` 用来把安装、运行时、发布包、外部接入与生命周期资产汇总成一个结论
 - `cgc-lifecycle` 用来把 roadmap、workflow 与 execution 当前分布汇总成生命周期阶段

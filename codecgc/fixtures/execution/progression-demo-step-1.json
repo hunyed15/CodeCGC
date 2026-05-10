@@ -2,7 +2,7 @@
   "product": "CodeCGC",
   "version": 1,
   "mode": "dry-run",
-  "timestamp": "2026-05-01T09:26:07.839528+00:00",
+  "timestamp": "2026-05-10T03:48:33.174705+00:00",
   "task_id": "progression-demo-step-1",
   "target": "frontend",
   "tool_name": "implement_frontend_task",
@@ -12,25 +12,25 @@
   "route_notes": [
     "src/components/ProgressionDemo.tsx -> forced:frontend"
   ],
-  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "routing_file": "model-routing.yaml",
   "source": {
     "type": "workflow-step",
-    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\features\\2026-05-01-progression-demo\\progression-demo-checklist.yaml",
+    "artifact_file": "codecgc/fixtures/features/2026-05-01-progression-demo/progression-demo-checklist.yaml",
     "artifact_type": "feature",
+    "artifact_class": "fixture",
     "artifact_slug": "2026-05-01-progression-demo",
     "step_number": 1,
-    "step_action": "Implement one frontend feature step",
-    "artifact_class": "fixture"
+    "step_action": "定义一个可执行的前端功能开发步骤"
   },
   "task_summary": "Implement only the approved frontend step in src/components/ProgressionDemo.tsx.",
   "constraints": [
-    "Do not edit files outside target_paths.",
-    "Do not change backend APIs."
+    "不要修改 target_paths 之外的文件。",
+    "不要改动后端 API。"
   ],
   "acceptance_criteria": [
     "Frontend progression demo is implemented."
   ],
-  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "cd": ".",
   "requested_session_id": "",
   "result": {
     "success": true,
@@ -47,6 +47,24 @@
     "risks": [
       "execution_not_performed"
     ],
-    "error": ""
+    "error": "",
+    "split_suggestion": {}
+  },
+  "file_evidence": {
+    "evidence_source": "not-collected",
+    "workspace_changed_files": [],
+    "verified_changed_files": [],
+    "out_of_scope_changed_files": [],
+    "file_diffs": [],
+    "evidence_confidence": "unknown",
+    "git_evidence": {
+      "git_repository_detected": false,
+      "git_root": "",
+      "history_available": false,
+      "status": "not-collected",
+      "tracked_changed_files": [],
+      "untracked_changed_files": [],
+      "git_changed_files": []
+    }
   }
 }

@@ -13,14 +13,18 @@ PACKAGE_JSON_PATH = WORKSPACE / "package.json"
 
 RUNTIME_ENTRYPOINTS = [
     "bin/codecgc.js",
+    "bin/cgc-start.js",
+    "codecgcmcp/src/codecgcmcp/cli.py",
     "scripts/install_codecgc.py",
     "scripts/codecgc_cli.py",
+    "scripts/codecgc_policy.py",
 ]
 
 RUNTIME_STATIC_REQUIREMENTS = [
     ".claude/hooks/route-edit.ps1",
     "model-routing.yaml",
     "requirements.txt",
+    "scripts/codecgc_runtime/__init__.py",
     "scripts/audit_codecgc_external_capabilities.py",
     "scripts/audit_codecgc_lifecycle.py",
     "codexmcp/pyproject.toml",
@@ -45,10 +49,25 @@ DOC_RUNTIME_PATHS = [
     "codecgc/cgc-onboard/SKILL.md",
     "codecgc/cgc-plan/SKILL.md",
     "codecgc/cgc-review/SKILL.md",
+    "codecgc/compound/codecgc-capability-matrix.md",
+    "codecgc/reference/README.md",
     "codecgc/reference/external-capability-registry.json",
     "codecgc/reference/lifecycle-playbook.md",
+    "codecgc/reference/maintainer-guide.md",
+    "codecgc/reference/mcp-tool-surface.md",
     "codecgc/reference/operation-guide.md",
+    "codecgc/reference/path-contract.md",
+    "codecgc/reference/policy-routing.md",
+    "codecgc/reference/project-structure.md",
+    "codecgc/reference/quickstart.md",
+    "codecgc/reference/onboarding.md",
+    "codecgc/reference/recovery-loop.md",
+    "codecgc/reference/real-workflow-loop.md",
     "codecgc/reference/release-maintenance-playbook.md",
+    "codecgc/reference/troubleshooting.md",
+    "codecgc/roadmap/codecgc-release-maintenance/delivery-plan.md",
+    "codecgc/roadmap/codecgc-release-maintenance/overview.md",
+    "codecgc/roadmap/codecgc-release-maintenance/phases.md",
 ]
 
 PLACEHOLDER_METADATA_MARKERS = (
@@ -148,16 +167,61 @@ def path_matches_package_files(path_text: str, file_rules: list[str]) -> bool:
             continue
         if normalized == normalized_rule:
             return True
+        if (WORKSPACE / normalized_rule).is_dir() and normalized.startswith(f"{normalized_rule}/"):
+            return True
     return False
 
 
 def resolve_local_python_module(module_name: str) -> str:
     relative = normalize_path_text(module_name.replace(".", "/") + ".py")
-    script_candidate = f"scripts/{relative.split('/')[-1]}"
-    if (WORKSPACE / script_candidate).exists():
-        return script_candidate
+    package_candidates = [
+        f"{package}/src/{relative}"
+        for package in ("codecgcmcp", "codexmcp", "geminimcp")
+        if module_name == package or module_name.startswith(f"{package}.")
+    ]
+    candidates = [
+        *package_candidates,
+        f"scripts/{relative}",
+        f"scripts/{relative.split('/')[-1]}",
+        relative,
+    ]
+    for candidate in candidates:
+        if (WORKSPACE / candidate).exists():
+            return candidate
+    package_init = f"scripts/{normalize_path_text(module_name.replace('.', '/'))}/__init__.py"
+    if (WORKSPACE / package_init).exists():
+        return package_init
+    for package in ("codecgcmcp", "codexmcp", "geminimcp"):
+        if module_name == package or module_name.startswith(f"{package}."):
+            package_init = f"{package}/src/{normalize_path_text(module_name.replace('.', '/'))}/__init__.py"
+            if (WORKSPACE / package_init).exists():
+                return package_init
+    root_package_init = f"{normalize_path_text(module_name.replace('.', '/'))}/__init__.py"
+    if (WORKSPACE / root_package_init).exists():
+        return root_package_init
     if (WORKSPACE / relative).exists():
         return relative
+    return ""
+
+
+def resolve_relative_python_module(current_path: str, level: int, module_name: str | None) -> str:
+    current = Path(normalize_path_text(current_path))
+    package_dir = current.parent
+    for _ in range(max(level - 1, 0)):
+        package_dir = package_dir.parent
+
+    if module_name:
+        candidate = package_dir / normalize_path_text(module_name.replace(".", "/") + ".py")
+        if (WORKSPACE / candidate).exists():
+            return normalize_path_text(str(candidate))
+
+        package_init = package_dir / normalize_path_text(module_name.replace(".", "/")) / "__init__.py"
+        if (WORKSPACE / package_init).exists():
+            return normalize_path_text(str(package_init))
+
+    init_candidate = package_dir / "__init__.py"
+    if (WORKSPACE / init_candidate).exists():
+        return normalize_path_text(str(init_candidate))
     return ""
 
 
@@ -174,7 +238,12 @@ def parse_local_python_dependencies(relative_path: str) -> tuple[list[str], list
                 if resolved:
                     imports.append(resolved)
         elif isinstance(node, ast.ImportFrom):
-            if node.level != 0 or not node.module:
+            if node.level != 0:
+                resolved_relative = resolve_relative_python_module(relative_path, node.level, node.module)
+                if resolved_relative:
+                    imports.append(resolved_relative)
+                continue
+            if not node.module:
                 continue
             resolved = resolve_local_python_module(node.module)
             if resolved:

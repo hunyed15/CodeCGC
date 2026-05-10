@@ -18,6 +18,7 @@
 - `cgc-status`
 - `cgc-doctor`
 - `cgc-package-audit`
+- `cgc-external-status`
 - `cgc-external-audit`
 - `cgc-release-readiness`
 
@@ -26,6 +27,7 @@
 - `cgc-status` 看项目级集成是否已同步
 - `cgc-doctor` 看 Python、MCP、执行器和项目级集成是否可运行
 - `cgc-package-audit` 看发布包是否覆盖运行时依赖与发布元数据
+- `cgc-external-status` 看第三方能力状态面板
 - `cgc-external-audit` 看第三方能力白名单与本地 MCP 观测状态
 - `cgc-release-readiness` 做总检查汇总，并补充仓库内 deploy / release 信号感知
 
@@ -69,7 +71,7 @@
 
 1. 先把接入意图写进 `codecgc/reference/external-capability-registry.json`
 2. 再把项目级或用户级 `.mcp.json` 接入做好；对 `MemOS`，优先直接使用官方 `memos-mcp`
-3. 最后用 `cgc-external-audit` 检查“登记状态”和“本地观测状态”是否一致
+3. 日常用 `cgc-external-status` 快速看面板，必要时再用 `cgc-external-audit` 检查“登记状态”和“本地观测状态”是否一致
 
 如果跳过第 1 步，CodeCGC 不把该接入视为正式产品能力。
 
@@ -116,6 +118,7 @@
 - `cgc-status` 无阻塞
 - `cgc-doctor` 无阻塞
 - `cgc-package-audit` 无阻塞
+- `cgc-external-status` 无阻塞
 - `cgc-external-audit` 无阻塞
 - `cgc-release-readiness` 总结论为通过
 

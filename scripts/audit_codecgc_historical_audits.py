@@ -6,6 +6,8 @@ from typing import Any
 from codecgc_artifact_roots import discover_flow_directory
 from codecgc_artifact_roots import execution_root
 from codecgc_artifact_roots import normalize_artifact_class
+from codecgc_path_contract import is_project_relative_path
+from codecgc_path_contract import resolve_project_path
 
 
 WORKSPACE = Path(__file__).resolve().parents[1]
@@ -31,6 +33,19 @@ def detect_root_class(path: Path) -> str:
 
 def contains_old_repo_name(value: Any) -> bool:
     return isinstance(value, str) and OLD_REPO_NAME in value
+
+
+def contains_persisted_absolute_project_path(value: Any) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    if is_project_relative_path(value):
+        return False
+    resolved = resolve_project_path(value)
+    try:
+        resolved.relative_to(WORKSPACE.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def expected_artifact_filename(artifact_type: str, artifact_slug: str) -> str:
@@ -97,7 +112,7 @@ def validate_source_contract(source: dict[str, Any]) -> list[dict[str, str]]:
         )
 
     if artifact_file:
-        artifact_file_path = Path(artifact_file)
+        artifact_file_path = resolve_project_path(artifact_file)
         if not artifact_file_path.exists():
             issues.append(
                 {
@@ -105,7 +120,7 @@ def validate_source_contract(source: dict[str, Any]) -> list[dict[str, str]]:
                     "detail": artifact_file,
                 }
             )
-        elif directory not in artifact_file_path.parents:
+        elif directory.resolve() not in artifact_file_path.resolve().parents:
             issues.append(
                 {
                     "problem": "source-artifact-file-directory-mismatch",
@@ -170,6 +185,31 @@ def inspect_audit(path: Path) -> list[dict[str, str]]:
             {
                 "path": str(path),
                 "problem": "old-repo-name-artifact-file",
+                "detail": str(source.get("artifact_file", "")),
+            }
+        )
+
+    if contains_persisted_absolute_project_path(data.get("routing_file")):
+        issues.append(
+            {
+                "path": str(path),
+                "problem": "absolute-project-routing-file",
+                "detail": str(data.get("routing_file", "")),
+            }
+        )
+    if contains_persisted_absolute_project_path(data.get("cd")):
+        issues.append(
+            {
+                "path": str(path),
+                "problem": "absolute-project-cd",
+                "detail": str(data.get("cd", "")),
+            }
+        )
+    if contains_persisted_absolute_project_path(source.get("artifact_file")):
+        issues.append(
+            {
+                "path": str(path),
+                "problem": "absolute-project-artifact-file",
                 "detail": str(source.get("artifact_file", "")),
             }
         )

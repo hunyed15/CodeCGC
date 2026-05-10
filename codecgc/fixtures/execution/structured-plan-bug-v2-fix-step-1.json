@@ -12,10 +12,10 @@
   "route_notes": [
     "backend/src/sync.py -> forced:backend"
   ],
-  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "routing_file": "model-routing.yaml",
   "source": {
     "type": "workflow-step",
-    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\issues\\2026-05-01-structured-plan-bug-v2\\structured-plan-bug-v2-fix.yaml",
+    "artifact_file": "codecgc/fixtures/issues/2026-05-01-structured-plan-bug-v2/structured-plan-bug-v2-fix.yaml",
     "artifact_type": "issue",
     "artifact_slug": "2026-05-01-structured-plan-bug-v2",
     "step_number": 1,
@@ -31,7 +31,7 @@
     "Malformed records are logged and skipped.",
     "Remaining valid records still persist."
   ],
-  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "cd": ".",
   "requested_session_id": "",
   "result": {
     "success": true,

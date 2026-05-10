@@ -12,10 +12,10 @@
   "route_notes": [
     "src/services/sync.ts -> forced:backend"
   ],
-  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "routing_file": "model-routing.yaml",
   "source": {
     "type": "workflow-step",
-    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\issues\\2026-05-01-demo-sync-bug\\demo-sync-bug-fix.yaml",
+    "artifact_file": "codecgc/fixtures/issues/2026-05-01-demo-sync-bug/demo-sync-bug-fix.yaml",
     "artifact_type": "issue",
     "artifact_slug": "2026-05-01-demo-sync-bug",
     "step_number": 1,
@@ -29,7 +29,7 @@
   "acceptance_criteria": [
     "Return a structured execution result."
   ],
-  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "cd": ".",
   "requested_session_id": "",
   "result": {
     "success": true,

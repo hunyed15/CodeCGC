@@ -4,6 +4,8 @@ from pathlib import Path
 
 from codecgc_console_io import configure_utf8_stdio
 from codecgc_console_io import print_json
+from codecgc_path_contract import normalize_persisted_project_path
+from codecgc_path_contract import resolve_project_path
 from codecgc_review_control import evaluate_review
 from write_codecgc_review import load_json
 from write_codecgc_review import render_review_decision
@@ -33,10 +35,11 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        audit = load_json(Path(args.audit_file))
+        audit_file = resolve_project_path(args.audit_file)
+        audit = load_json(audit_file)
         values = evaluate_review(audit, args.decision, args.risk, args.next_step)
         writeback = write_review(
-            audit_path=Path(args.audit_file),
+            audit_path=audit_file,
             decision=args.decision,
             risks=args.risk,
             next_step=args.next_step,
@@ -44,7 +47,7 @@ def main() -> int:
         )
         result = {
             "success": True,
-            "audit_file": args.audit_file,
+            "audit_file": normalize_persisted_project_path(audit_file),
             "requested_decision": args.decision,
             "final_decision": values["final_decision"],
             "accepted": values["accepted"],

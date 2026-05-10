@@ -1,13 +1,17 @@
 import argparse
 import json
 import sys
-import yaml
-from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from codecgc_console_io import configure_utf8_stdio
 from codecgc_console_io import print_json
+from codecgc_path_contract import normalize_persisted_project_path
+from codecgc_policy import classify_path
+from codecgc_policy import load_policy
+from codecgc_policy import validate_executor_target
 from codecgc_routing_paths import resolve_active_routing_file
 from codecgc_runtime_paths import PACKAGE_ROOT
 from codecgc_runtime_paths import PROJECT_ROOT
@@ -26,19 +30,7 @@ def normalize_path_text(path_text: str) -> str:
 
 def load_simple_routing_config(path: Path) -> dict[str, Any]:
     """Load routing configuration YAML file using standard yaml library."""
-    if not path.exists():
-        raise FileNotFoundError(f"Routing file not found: {path}")
-
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        if not isinstance(data, dict):
-            raise ValueError(f"Routing config must be a dictionary, got {type(data).__name__}")
-
-        return data
-    except yaml.YAMLError as e:
-        raise ValueError(f"Failed to parse routing YAML file {path}: {e}") from e
+    return load_policy(path)
 
 
 def load_checklist_yaml(path: Path) -> dict[str, Any]:
@@ -61,9 +53,40 @@ def load_checklist_yaml(path: Path) -> dict[str, Any]:
 def normalize_string_list(value: Any) -> list[str]:
     if value is None:
         return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
     if isinstance(value, list):
-        return [str(item) for item in value]
-    return [str(value)]
+        normalized: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if text:
+                normalized.append(text)
+        return normalized
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def is_executable_codecgc_block(block: Any) -> bool:
+    """Compatibility helper for older tests and scripts.
+
+    Runtime step selection uses codecgc_step_control.is_executable_codecgc_block,
+    which is intentionally stricter. This helper preserves the historical task
+    builder contract: explicit frontend/backend kind plus at least one target.
+    """
+    if not isinstance(block, dict):
+        return False
+
+    kind = str(block.get("kind", "")).strip().lower()
+    if not kind or kind == "auto":
+        return False
+
+    target_paths = block.get("target_paths", [])
+    if not isinstance(target_paths, list):
+        return False
+
+    return any(str(path).strip() for path in target_paths)
 
 
 def resolve_optional_value(cli_value: Any, spec_value: Any, default_value: Any) -> Any:
@@ -140,7 +163,7 @@ def load_checklist_step_payload(args: argparse.Namespace) -> dict[str, Any]:
         "constraint": constraints,
         "acceptance": acceptance,
         "cd": resolve_cd_value(str(resolve_optional_value(args.cd, step_spec.get("cd"), None))),
-        "routing_file": str(Path(str(args.routing_file)).resolve()),
+        "routing_file": normalize_persisted_project_path(args.routing_file),
         "session_id": str(resolve_optional_value(args.session_id, step_spec.get("session_id"), "")),
         "model": str(resolve_optional_value(args.model, step_spec.get("model"), "")),
         "profile": str(resolve_optional_value(args.profile, step_spec.get("profile"), "")),
@@ -160,7 +183,7 @@ def load_checklist_step_payload(args: argparse.Namespace) -> dict[str, Any]:
         "timeout_seconds": int(step_spec.get("timeout_seconds", 0)) or 0,
         "source": {
             "type": "workflow-step",
-            "artifact_file": str(checklist_path.resolve()),
+            "artifact_file": normalize_persisted_project_path(checklist_path),
             "artifact_type": artifact_type,
             "artifact_class": artifact_class,
             "artifact_slug": artifact_slug,
@@ -179,7 +202,7 @@ def load_explicit_task_payload(args: argparse.Namespace) -> dict[str, Any]:
         "constraint": args.constraint,
         "acceptance": args.acceptance,
         "cd": resolve_cd_value(args.cd),
-        "routing_file": str(Path(str(args.routing_file)).resolve()),
+        "routing_file": normalize_persisted_project_path(args.routing_file),
         "session_id": args.session_id or "",
         "model": args.model or "",
         "profile": args.profile or "",
@@ -190,26 +213,6 @@ def load_explicit_task_payload(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def classify_path(path_text: str, routing: dict[str, Any]) -> str:
-    normalized = normalize_path_text(path_text)
-
-    for pattern in routing.get("shared_paths", []):
-        if fnmatch(normalized, pattern):
-            return "shared"
-
-    frontend_patterns = list(routing.get("frontend_paths", [])) + list(routing.get("custom_frontend_paths", []))
-    for pattern in frontend_patterns:
-        if fnmatch(normalized, pattern):
-            return "frontend"
-
-    backend_patterns = list(routing.get("backend_paths", [])) + list(routing.get("custom_backend_paths", []))
-    for pattern in backend_patterns:
-        if fnmatch(normalized, pattern):
-            return "backend"
-
-    return "unknown"
-
-
 def classify_paths(paths: list[str], routing: dict[str, Any]) -> dict[str, str]:
     return {path: classify_path(path, routing) for path in paths}
 
@@ -218,6 +221,10 @@ def split_paths_by_category(classifications: dict[str, str]) -> dict[str, list[s
     grouped = {
         "frontend": [],
         "backend": [],
+        "frontend-test": [],
+        "backend-test": [],
+        "docs": [],
+        "orchestration": [],
         "shared": [],
         "unknown": [],
     }
@@ -275,13 +282,15 @@ def detect_target_kind(paths: list[str], routing: dict[str, Any]) -> tuple[str, 
     classifications = classify_paths(paths, routing)
     categories = set(classifications.values())
 
-    if "shared" in categories:
+    if categories & {"shared", "docs", "orchestration"}:
         details = [
-            f"{path} -> shared" for path, category in classifications.items() if category == "shared"
+            f"{path} -> {category}"
+            for path, category in classifications.items()
+            if category in {"shared", "docs", "orchestration"}
         ]
         split_payload = build_split_required_payload(paths, routing)
         raise ValueError(
-            "Detected shared paths. Split the task first.\n"
+            "Detected non-executor-owned paths. Route them through Claude workflow first.\n"
             + "\n".join(details)
             + "\nSPLIT_PAYLOAD: "
             + json.dumps(split_payload, ensure_ascii=False)
@@ -295,10 +304,10 @@ def detect_target_kind(paths: list[str], routing: dict[str, Any]) -> tuple[str, 
             "Some target paths are not covered by model-routing.yaml.\n" + "\n".join(details)
         )
 
-    if categories == {"frontend"}:
+    if categories <= {"frontend", "frontend-test"}:
         return "frontend", [f"{path} -> frontend" for path in paths]
 
-    if categories == {"backend"}:
+    if categories <= {"backend", "backend-test"}:
         return "backend", [f"{path} -> backend" for path in paths]
 
     details = [f"{path} -> {classifications[path]}" for path in paths]
@@ -328,6 +337,13 @@ def build_tool_call(args: argparse.Namespace, routing: dict[str, Any]) -> dict[s
     else:
         kind = requested_kind
         route_notes = [f"{path} -> forced:{kind}" for path in target_paths]
+
+    policy_result = validate_executor_target(kind, target_paths, routing)
+    if not policy_result.get("allowed"):
+        raise ValueError(
+            "Target paths violate CodeCGC routing policy.\n"
+            + json.dumps(policy_result, ensure_ascii=False)
+        )
 
     if kind == "frontend":
         tool_name = "implement_frontend_task"
@@ -367,6 +383,7 @@ def build_tool_call(args: argparse.Namespace, routing: dict[str, Any]) -> dict[s
         "tool_name": tool_name,
         "tool_args": tool_args,
         "route_notes": route_notes,
+        "policy": policy_result,
         "routing_file": payload_inputs["routing_file"],
     }
     if payload_inputs["source"] is not None:

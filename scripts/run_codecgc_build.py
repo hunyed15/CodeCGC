@@ -7,6 +7,9 @@ from codecgc_console_io import configure_utf8_stdio
 from codecgc_console_io import print_json
 from codecgc_flow_control import build_execution_result
 from codecgc_flow_control import build_not_ready_result
+from codecgc_policy import load_policy
+from codecgc_policy import validate_executor_target
+from codecgc_routing_paths import resolve_active_routing_file
 from codecgc_session_recovery import resolve_session_id_from_task
 from codecgc_step_control import get_step_metadata
 from codecgc_step_control import select_next_executable_step
@@ -60,6 +63,31 @@ def main() -> int:
             "next": "先处理仅规划步骤，或补齐缺失的可执行步骤，再进入 build 执行。",
         }
         print_json(result)
+        return 1
+
+    try:
+        policy_result = validate_executor_target(
+            str(selected.get("kind", "")),
+            [str(path) for path in selected.get("target_paths", [])],
+            load_policy(resolve_active_routing_file()),
+        )
+        if not policy_result.get("allowed"):
+            result = {
+                "success": False,
+                "flow": "feature",
+                "slug": args.slug,
+                "state": "not-ready",
+                "failure_type": "policy",
+                "route": route,
+                "selected_step": selected,
+                "policy": policy_result,
+                "recommended_command": to_public_command("cgc-plan"),
+                "next": "Adjust target_paths or split the task before build execution.",
+            }
+            print_json(result)
+            return 1
+    except Exception as error:
+        print_json({"success": False, "error": str(error), "failure_type": "policy"}, file=sys.stderr)
         return 1
 
     effective_session_id = args.session_id.strip()

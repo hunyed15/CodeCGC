@@ -8,6 +8,8 @@ from codecgc_artifact_roots import flow_root
 from codecgc_artifact_roots import normalize_artifact_class
 from codecgc_console_io import configure_utf8_stdio
 from codecgc_console_io import print_json
+from codecgc_path_contract import normalize_persisted_project_path
+from codecgc_path_contract import resolve_project_path
 from codecgc_review_control import ACTION_KIND_LABELS
 from codecgc_review_control import FALLBACK_STAGE_LABELS
 from codecgc_review_control import display_policy_reason
@@ -50,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_json(path: Path) -> dict[str, Any]:
+    path = resolve_project_path(path)
     if not path.exists():
         raise FileNotFoundError(f"未找到审计文件：{path}")
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -87,7 +90,7 @@ def resolve_checklist_path_from_audit(audit: dict[str, Any]) -> Path:
     artifact_file = str(source.get("artifact_file", ""))
     if not artifact_file:
         raise ValueError("审计 source 缺少 artifact_file。")
-    return Path(artifact_file)
+    return resolve_project_path(artifact_file)
 
 
 def resolve_step_number_from_audit(audit: dict[str, Any]) -> int:
@@ -223,6 +226,7 @@ def extract_title(body: str) -> str:
 
 
 def write_review(audit_path: Path, decision: str, risks: list[str], next_step: str, force: bool) -> dict[str, str]:
+    audit_path = resolve_project_path(audit_path)
     audit = load_json(audit_path)
     artifact_type, artifact_path = resolve_artifact_path(audit)
     checklist_path = resolve_checklist_path_from_audit(audit)
@@ -248,8 +252,8 @@ def write_review(audit_path: Path, decision: str, risks: list[str], next_step: s
     )
     return {
         "artifact_type": artifact_type,
-        "artifact_path": str(artifact_path),
-        "checklist_path": str(checklist_path),
+        "artifact_path": normalize_persisted_project_path(artifact_path),
+        "checklist_path": normalize_persisted_project_path(checklist_path),
         "step_number": str(step_number),
         "step_status": "done" if values["final_decision"] == "accepted" else "pending",
     }

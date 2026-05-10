@@ -15,6 +15,16 @@ from codecgc_workflow_runtime import run_json_script
 
 mcp = FastMCP("CodeCGC MCP Server")
 
+MCP_CONTRACT_VERSION = "1.0"
+
+EXCEPTION_ERROR_CATEGORIES = {
+    "JSONDecodeError": "runtime-json-invalid",
+    "ValueError": "runtime-json-invalid",
+    "TimeoutExpired": "runtime-timeout",
+    "FileNotFoundError": "runtime-script-missing",
+    "PermissionError": "runtime-permission-denied",
+}
+
 
 def _append_repeated_flag(args: list[str], flag: str, values: list[str]) -> None:
     for value in values:
@@ -27,16 +37,104 @@ def _normalize_workspace(workspace: str) -> str:
     return str(Path(workspace).expanduser().resolve()) if str(workspace).strip() else ""
 
 
-def _as_tool_result(payload: dict[str, Any]) -> CallToolResult:
+def _payload_success(payload: dict[str, Any]) -> bool:
+    return bool(payload.get("success", True))
+
+
+def _runtime_error_category(payload: dict[str, Any]) -> str:
+    raw_category = str(payload.get("error_category") or payload.get("failure_category") or "").strip()
+    if raw_category:
+        return raw_category
+    returncode = payload.get("returncode")
+    if returncode is not None:
+        return "runtime-script-failed"
+    return "runtime-payload-failed"
+
+
+def _payload_error(tool_name: str, script_name: str, args: tuple[str, ...], payload: dict[str, Any]) -> dict[str, Any] | None:
+    if _payload_success(payload):
+        return None
+    summary = payload.get("summary", {}) if isinstance(payload.get("summary"), dict) else {}
+    message = str(
+        payload.get("error")
+        or summary.get("human_summary")
+        or summary.get("recommended_next_action")
+        or "Runtime script reported failure."
+    )
+    return {
+        "type": str(payload.get("error_type") or "RuntimeScriptError"),
+        "category": _runtime_error_category(payload),
+        "message": message,
+        "tool": tool_name,
+        "script": script_name,
+        "args": list(args),
+        "returncode": payload.get("returncode"),
+    }
+
+
+def _exception_category(error: Exception) -> str:
+    return EXCEPTION_ERROR_CATEGORIES.get(error.__class__.__name__, "mcp-wrapper-exception")
+
+
+def _exception_payload(tool_name: str, script_name: str, args: tuple[str, ...], error: Exception) -> tuple[dict[str, Any], dict[str, Any]]:
+    normalized_error = {
+        "type": error.__class__.__name__,
+        "category": _exception_category(error),
+        "message": str(error),
+        "tool": tool_name,
+        "script": script_name,
+        "args": list(args),
+        "returncode": None,
+    }
+    payload = {
+        "success": False,
+        "mode": "mcp-runtime-call",
+        "summary": {
+            "ready": False,
+            "human_summary": "CodeCGC MCP tool failed before a runtime JSON payload was produced.",
+            "recommended_next_action": "Check the runtime script output and MCP server logs.",
+        },
+    }
+    return payload, normalized_error
+
+
+def _build_tool_envelope(tool_name: str, payload: dict[str, Any], error: dict[str, Any] | None = None) -> dict[str, Any]:
+    success = _payload_success(payload) and error is None
+    return {
+        "success": success,
+        "tool": tool_name,
+        "payload": payload,
+        "error": error,
+        "meta": {
+            "contract_version": MCP_CONTRACT_VERSION,
+            "payload_success": _payload_success(payload),
+            "response_shape": "codecgc.mcp.tool_result",
+        },
+    }
+
+
+def _as_tool_result(tool_name: str, payload: dict[str, Any], error: dict[str, Any] | None = None) -> CallToolResult:
+    envelope = _build_tool_envelope(tool_name, payload, error)
     return CallToolResult(
         content=[
             TextContent(
                 type="text",
-                text=json.dumps(payload, ensure_ascii=True, indent=2),
+                text=json.dumps(envelope, ensure_ascii=False, indent=2),
             )
         ],
-        isError=not bool(payload.get("success", True)),
+        isError=not bool(envelope.get("success", True)),
     )
+
+
+def _call_runtime_tool(tool_name: str, script_name: str, *args: str, requested_format: str = "") -> CallToolResult:
+    try:
+        payload = run_json_script(script_name, *args)
+        if requested_format:
+            payload.setdefault("requested_format", requested_format)
+        return _as_tool_result(tool_name, payload, _payload_error(tool_name, script_name, args, payload))
+    except Exception as error:
+        payload, normalized_error = _exception_payload(tool_name, script_name, args, error)
+        return _as_tool_result(tool_name, payload, normalized_error)
 
 
 @mcp.tool(
@@ -51,7 +149,7 @@ async def codecgc_install(
     ] = "local",
     format: Annotated[
         Literal["summary", "json"],
-        Field(description="Output format. Use summary for normal product-facing replies."),
+        Field(description="Presentation hint. MCP responses are always returned as JSON payloads."),
     ] = "summary",
     workspace: Annotated[
         str,
@@ -62,13 +160,14 @@ async def codecgc_install(
         Field(description="Optional explicit Claude user root for user/user-dry-run modes."),
     ] = "",
 ) -> CallToolResult:
-    args = ["--mode", mode, "--format", format]
+    # The MCP surface must always receive machine-readable JSON from the script.
+    args = ["--mode", mode, "--format", "json"]
     normalized_workspace = _normalize_workspace(workspace)
     if normalized_workspace:
         args.extend(["--workspace", normalized_workspace])
     if str(user_root).strip():
         args.extend(["--user-root", str(user_root).strip()])
-    return _as_tool_result(run_json_script("install_codecgc.py", *args))
+    return _call_runtime_tool("codecgc.install", "install_codecgc.py", *args, requested_format=format)
 
 
 @mcp.tool(
@@ -86,7 +185,25 @@ async def codecgc_status(
     normalized_workspace = _normalize_workspace(workspace)
     if normalized_workspace:
         args.extend(["--workspace", normalized_workspace])
-    return _as_tool_result(run_json_script("install_codecgc.py", *args))
+    return _call_runtime_tool("codecgc.status", "install_codecgc.py", *args)
+
+
+@mcp.tool(
+    name="codecgc.start",
+    description="Show the project-local CodeCGC first-run guide and recommended next actions.",
+    meta={"version": "0.1.0", "author": "CodeCGC"},
+)
+async def codecgc_start(
+    workspace: Annotated[
+        str,
+        Field(description="Optional target workspace root."),
+    ] = "",
+) -> CallToolResult:
+    args = ["--mode", "start", "--format", "json"]
+    normalized_workspace = _normalize_workspace(workspace)
+    if normalized_workspace:
+        args.extend(["--workspace", normalized_workspace])
+    return _call_runtime_tool("codecgc.start", "install_codecgc.py", *args)
 
 
 @mcp.tool(
@@ -104,7 +221,7 @@ async def codecgc_doctor(
     normalized_workspace = _normalize_workspace(workspace)
     if normalized_workspace:
         args.extend(["--workspace", normalized_workspace])
-    return _as_tool_result(run_json_script("install_codecgc.py", *args))
+    return _call_runtime_tool("codecgc.doctor", "install_codecgc.py", *args)
 
 
 @mcp.tool(
@@ -152,7 +269,7 @@ async def codecgc_entry(
         args.extend(["--audit-file", str(audit_file).strip()])
     if decision:
         args.extend(["--decision", decision])
-    return _as_tool_result(run_json_script("entry_codecgc_workflow.py", *args))
+    return _call_runtime_tool("codecgc.entry", "entry_codecgc_workflow.py", *args)
 
 
 @mcp.tool(
@@ -185,7 +302,7 @@ async def codecgc_continue(
         args.append("--auto-dispatch")
     if dry_run:
         args.append("--dry-run")
-    return _as_tool_result(run_json_script("entry_codecgc_workflow.py", *args))
+    return _call_runtime_tool("codecgc.continue", "entry_codecgc_workflow.py", *args)
 
 
 @mcp.tool(
@@ -212,7 +329,7 @@ async def codecgc_explain(
         args.append("--latest")
     if include_fixtures:
         args.append("--include-fixtures")
-    return _as_tool_result(run_json_script("entry_codecgc_workflow.py", *args))
+    return _call_runtime_tool("codecgc.explain", "entry_codecgc_workflow.py", *args)
 
 
 @mcp.tool(
@@ -236,7 +353,7 @@ async def codecgc_review(
         args.extend(["--next-step", str(next_step).strip()])
     if force:
         args.append("--force")
-    return _as_tool_result(run_json_script("review_codecgc_workflow.py", *args))
+    return _call_runtime_tool("codecgc.review", "review_codecgc_workflow.py", *args)
 
 
 @mcp.tool(
@@ -256,7 +373,7 @@ async def codecgc_history(
     args = ["--flow", flow, "--status", str(status).strip() or "all", "--last", str(int(last)), "--format", "json"]
     if include_fixtures:
         args.append("--include-fixtures")
-    return _as_tool_result(run_json_script("audit_codecgc_workflow_history.py", *args))
+    return _call_runtime_tool("codecgc.history", "audit_codecgc_workflow_history.py", *args)
 
 
 @mcp.tool(
@@ -271,7 +388,7 @@ async def codecgc_route(
     ],
     slug: Annotated[str, "Workflow slug."],
 ) -> CallToolResult:
-    return _as_tool_result(run_json_script("route_codecgc_workflow.py", "--flow", flow, "--slug", str(slug).strip()))
+    return _call_runtime_tool("codecgc.route", "route_codecgc_workflow.py", "--flow", flow, "--slug", str(slug).strip())
 
 
 @mcp.tool(
@@ -354,7 +471,7 @@ async def codecgc_plan(
     args.extend(["--artifact-class", artifact_class])
     if force:
         args.append("--force")
-    return _as_tool_result(run_json_script("plan_codecgc_workflow.py", *args))
+    return _call_runtime_tool("codecgc.plan", "plan_codecgc_workflow.py", *args)
 
 
 @mcp.tool(
@@ -385,7 +502,7 @@ async def codecgc_build(
         args.append("--dry-run")
     if return_all_messages:
         args.append("--return-all-messages")
-    return _as_tool_result(run_json_script("run_codecgc_build.py", *args))
+    return _call_runtime_tool("codecgc.build", "run_codecgc_build.py", *args)
 
 
 @mcp.tool(
@@ -416,7 +533,7 @@ async def codecgc_fix(
         args.append("--dry-run")
     if return_all_messages:
         args.append("--return-all-messages")
-    return _as_tool_result(run_json_script("run_codecgc_fix.py", *args))
+    return _call_runtime_tool("codecgc.fix", "run_codecgc_fix.py", *args)
 
 
 @mcp.tool(
@@ -451,7 +568,7 @@ async def codecgc_test(
         args.append("--dry-run")
     if return_all_messages:
         args.append("--return-all-messages")
-    return _as_tool_result(run_json_script("run_codecgc_test.py", *args))
+    return _call_runtime_tool("codecgc.test", "run_codecgc_test.py", *args)
 
 
 @mcp.tool(
@@ -465,7 +582,15 @@ async def codecgc_package_audit(
         Field(description="Output format."),
     ] = "json",
 ) -> CallToolResult:
-    return _as_tool_result(run_json_script("audit_codecgc_package_runtime.py", "--format", format))
+    return _call_runtime_tool("codecgc.package_audit", "audit_codecgc_package_runtime.py", "--format", format)
+
+
+def _external_capability_runtime_args(view: str, workspace: str, format: str) -> list[str]:
+    args = ["--view", view, "--format", format]
+    normalized_workspace = _normalize_workspace(workspace)
+    if normalized_workspace:
+        args.extend(["--workspace", normalized_workspace])
+    return args
 
 
 @mcp.tool(
@@ -480,11 +605,24 @@ async def codecgc_external_audit(
         Field(description="Output format."),
     ] = "json",
 ) -> CallToolResult:
-    args = ["--format", format]
-    normalized_workspace = _normalize_workspace(workspace)
-    if normalized_workspace:
-        args.extend(["--workspace", normalized_workspace])
-    return _as_tool_result(run_json_script("audit_codecgc_external_capabilities.py", *args))
+    args = _external_capability_runtime_args("audit", workspace, format)
+    return _call_runtime_tool("codecgc.external_audit", "audit_codecgc_external_capabilities.py", *args)
+
+
+@mcp.tool(
+    name="codecgc.external_status",
+    description="Render the concise external capability status panel for day-to-day checks.",
+    meta={"version": "0.1.0", "author": "CodeCGC"},
+)
+async def codecgc_external_status(
+    workspace: Annotated[str, "Optional target workspace root."] = "",
+    format: Annotated[
+        Literal["summary", "json"],
+        Field(description="Output format."),
+    ] = "summary",
+) -> CallToolResult:
+    args = _external_capability_runtime_args("status", workspace, format)
+    return _call_runtime_tool("codecgc.external_status", "audit_codecgc_external_capabilities.py", *args)
 
 
 @mcp.tool(
@@ -503,7 +641,7 @@ async def codecgc_release_readiness(
     normalized_workspace = _normalize_workspace(workspace)
     if normalized_workspace:
         args.extend(["--workspace", normalized_workspace])
-    return _as_tool_result(run_json_script("audit_codecgc_release_readiness.py", *args))
+    return _call_runtime_tool("codecgc.release_readiness", "audit_codecgc_release_readiness.py", *args)
 
 
 @mcp.tool(
@@ -517,7 +655,7 @@ async def codecgc_lifecycle(
         Field(description="Output format."),
     ] = "json",
 ) -> CallToolResult:
-    return _as_tool_result(run_json_script("audit_codecgc_lifecycle.py", "--format", format))
+    return _call_runtime_tool("codecgc.lifecycle", "audit_codecgc_lifecycle.py", "--format", format)
 
 
 def run() -> None:

@@ -9,6 +9,16 @@ from codecgc_runtime_paths import resolve_workspace_root
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = WORKSPACE / "codecgc" / "reference" / "external-capability-registry.json"
+STATUS_PANEL_CAPABILITY_ORDER = [
+    "memos",
+    "github-mcp",
+    "linear-mcp",
+    "sentry-mcp",
+]
+STATUS_PANEL_SUPPORT_CAPABILITY_ORDER = [
+    "augment-search",
+    "jira-mcp",
+]
 
 
 def load_registry() -> dict[str, Any]:
@@ -107,7 +117,7 @@ def normalize_capability_entry(entry: dict[str, Any], workspace_servers: dict[st
     }
 
 
-def audit_external_capabilities(workspace_override: str = "") -> dict[str, Any]:
+def audit_external_capabilities(workspace_override: str = "", view: str = "audit") -> dict[str, Any]:
     registry = load_registry()
     workspace_servers, workspace_root = load_workspace_mcp_servers(workspace_override)
     entries = registry.get("capabilities", [])
@@ -142,6 +152,8 @@ def audit_external_capabilities(workspace_override: str = "") -> dict[str, Any]:
         human_summary = "外部能力登记表存在缺失字段或非法项。"
     elif drift_items:
         human_summary = "外部能力登记表已就绪，但发现本地额外接入漂移。"
+    elif view == "status":
+        human_summary = "外部能力状态面板已就绪。"
 
     recommended_next_action = ""
     if blocking_items:
@@ -158,12 +170,14 @@ def audit_external_capabilities(workspace_override: str = "") -> dict[str, Any]:
     return {
         "success": ready,
         "mode": "external-capability-audit",
+        "presentation_view": view,
         "workspace": str(workspace_root),
         "registry_path": str(REGISTRY_PATH),
         "summary": {
             "ready": ready,
             "scope": "外部能力白名单、接入状态声明与本地 MCP 观测状态",
             "human_summary": human_summary,
+            "view": view,
             "capability_count": len(normalized),
             "integrated_count": counts["integrated"],
             "planned_count": counts["planned"],
@@ -178,7 +192,31 @@ def audit_external_capabilities(workspace_override: str = "") -> dict[str, Any]:
     }
 
 
-def build_summary(result: dict[str, Any]) -> str:
+def _capability_by_id(result: dict[str, Any], capability_id: str) -> dict[str, Any] | None:
+    for item in result.get("capabilities", []):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("id", "")).strip() == capability_id:
+            return item
+    return None
+
+
+def _format_capability_panel_line(item: dict[str, Any]) -> str:
+    status = str(item.get("status", "")).strip()
+    status_label = {
+        "integrated": "已纳管",
+        "planned": "规划中",
+        "optional": "可选",
+    }.get(status, status or "未知")
+    local_label = "已观测" if item.get("local_ready") else "未观测"
+    observed = ", ".join(str(value).strip() for value in item.get("observed_servers", []) if str(value).strip()) or "无"
+    return (
+        f"- {item.get('name', '')} [{item.get('id', '')}]: "
+        f"{status_label} | 本地={local_label} | 服务器={observed}"
+    )
+
+
+def build_audit_summary(result: dict[str, Any]) -> str:
     summary = result.get("summary", {}) if isinstance(result.get("summary"), dict) else {}
     lines = [
         f"- 工作区: {result.get('workspace', '')}",
@@ -249,8 +287,46 @@ def build_summary(result: dict[str, Any]) -> str:
     return render_summary_block("CodeCGC 外部能力审计", lines, next_actions)
 
 
+def build_status_panel(result: dict[str, Any]) -> str:
+    summary = result.get("summary", {}) if isinstance(result.get("summary"), dict) else {}
+    lines = [
+        f"- 工作区: {result.get('workspace', '')}",
+        f"- 登记表: {result.get('registry_path', '')}",
+        f"- 范围: {summary.get('scope', '')}",
+        f"- 摘要: {summary.get('human_summary', '')}",
+        f"- 就绪: {'是' if summary.get('ready') else '否'}",
+        f"- 正式接入: {summary.get('integrated_count', 0)}",
+        f"- 规划中: {summary.get('planned_count', 0)}",
+        f"- 可选项: {summary.get('optional_count', 0)}",
+        f"- 阻塞项: {summary.get('blocking_count', 0)}",
+        f"- 漂移项: {summary.get('drift_count', 0)}",
+        "- 正式能力面板:",
+    ]
+    for capability_id in STATUS_PANEL_CAPABILITY_ORDER:
+        item = _capability_by_id(result, capability_id)
+        if isinstance(item, dict):
+            lines.append(_format_capability_panel_line(item))
+    lines.append("- 其他受管能力:")
+    for capability_id in STATUS_PANEL_SUPPORT_CAPABILITY_ORDER:
+        item = _capability_by_id(result, capability_id)
+        if isinstance(item, dict):
+            lines.append(_format_capability_panel_line(item))
+    next_actions = []
+    next_action = str(summary.get("recommended_next_action", "")).strip()
+    if next_action:
+        next_actions.append(next_action)
+    next_actions.append("需要更细的登记一致性检查时，再跑 cgc-external-audit")
+    return render_summary_block("CodeCGC 外部能力状态面板", lines, next_actions)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit CodeCGC external capability registry and local MCP observations.")
+    parser.add_argument(
+        "--view",
+        choices=["audit", "status"],
+        default="audit",
+        help="Rendered summary view. Audit is detailed; status is the concise panel view.",
+    )
     parser.add_argument(
         "--format",
         choices=["json", "summary"],
@@ -264,9 +340,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    result = audit_external_capabilities(args.workspace)
+    result = audit_external_capabilities(args.workspace, view=args.view)
     if args.format == "summary":
-        print(build_summary(result))
+        if args.view == "status":
+            print(build_status_panel(result))
+        else:
+            print(build_audit_summary(result))
     else:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result.get("success") else 1

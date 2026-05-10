@@ -3033,6 +3033,10 @@ def run_existing_mode(args: argparse.Namespace, explain_only: bool) -> dict[str,
         "dispatched": False,
         "dispatch_result": None,
     }
+    if matches_command(recommended_command, "cgc-plan") and isinstance(route.get("replan_payload"), dict):
+        merged_replan_payload = dict(replan_payload)
+        merged_replan_payload.update(route.get("replan_payload", {}))
+        result["replan_payload"] = merged_replan_payload
     if explain_only or not effective_auto_dispatch:
         result["next"] = build_user_facing_next(result)
         result["human_summary"] = build_existing_mode_human_summary(result)

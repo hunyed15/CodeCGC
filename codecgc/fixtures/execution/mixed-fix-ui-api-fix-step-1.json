@@ -12,10 +12,10 @@
   "route_notes": [
     "src/components/LoginForm.tsx -> forced:frontend"
   ],
-  "routing_file": "D:\\Software\\VibeCoding\\CodeCGC\\model-routing.yaml",
+  "routing_file": "model-routing.yaml",
   "source": {
     "type": "workflow-step",
-    "artifact_file": "D:\\Software\\VibeCoding\\CodeCGC\\codecgc\\fixtures\\issues\\2026-05-01-mixed-fix-ui-api\\mixed-fix-ui-api-fix.yaml",
+    "artifact_file": "codecgc/fixtures/issues/2026-05-01-mixed-fix-ui-api/mixed-fix-ui-api-fix.yaml",
     "artifact_type": "issue",
     "artifact_slug": "2026-05-01-mixed-fix-ui-api",
     "step_number": 1,
@@ -30,7 +30,7 @@
   "acceptance_criteria": [
     "Frontend validation bug is fixed."
   ],
-  "cd": "D:\\Software\\VibeCoding\\CodeCGC",
+  "cd": ".",
   "requested_session_id": "",
   "result": {
     "success": true,

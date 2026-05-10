@@ -34,9 +34,8 @@ def is_executable_codecgc_block(codecgc: Any) -> bool:
     if any(is_placeholder_path(path) for path in target_paths):
         return False
 
-    task_id = str(codecgc.get("task_id", "")).strip()
     task_summary = str(codecgc.get("task_summary", "")).strip()
-    return bool(task_id and task_summary)
+    return bool(task_summary)
 
 
 def is_test_codecgc_block(codecgc: Any) -> bool:
@@ -87,6 +86,7 @@ def select_next_executable_step(checklist_path: Path) -> dict[str, Any]:
         "task_id": str(codecgc.get("task_id", "")),
         "action": str(step.get("action", "")),
         "kind": str(codecgc.get("kind", "")),
+        "step_type": str(codecgc.get("step_type", "")),
         "target_paths": codecgc.get("target_paths", []),
         "task_summary": str(codecgc.get("task_summary", "")),
         "artifact_type": resolve_artifact_type(data),
@@ -107,6 +107,7 @@ def get_step_metadata(checklist_path: Path, step_number: int) -> dict[str, Any]:
         "task_id": str(codecgc.get("task_id", "")),
         "action": str(step.get("action", "")) if isinstance(step, dict) else "",
         "kind": str(codecgc.get("kind", "")),
+        "step_type": str(codecgc.get("step_type", "")),
         "target_paths": codecgc.get("target_paths", []),
         "task_summary": str(codecgc.get("task_summary", "")),
         "artifact_type": resolve_artifact_type(data),

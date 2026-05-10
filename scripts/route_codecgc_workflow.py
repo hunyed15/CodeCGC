@@ -13,6 +13,7 @@ from codecgc_artifact_roots import normalize_artifact_class
 from codecgc_command_surface import to_public_command
 from codecgc_console_io import configure_utf8_stdio
 from codecgc_console_io import print_json
+from codecgc_path_contract import normalize_persisted_project_path
 from codecgc_routing_paths import resolve_active_routing_file
 from codecgc_runtime_paths import PACKAGE_ROOT
 from codecgc_step_control import is_test_codecgc_block
@@ -21,6 +22,10 @@ from codecgc_step_control import select_next_executable_step
 
 WORKSPACE = PACKAGE_ROOT
 ROUTING_FILE = resolve_active_routing_file()
+
+
+def display_path(path: Path | None) -> str:
+    return normalize_persisted_project_path(path) if path else ""
 
 
 def attach_route_summary(result: dict[str, Any]) -> dict[str, Any]:
@@ -189,16 +194,28 @@ def find_audit_for_task_id(task_id: str, artifact_class: str) -> tuple[Path | No
     return audit_path, audit
 
 
-def extract_review_metadata(path: Path) -> dict[str, Any]:
-    text = load_text(path)
+def parse_review_metadata(markdown: str) -> dict[str, Any]:
+    text = str(markdown or "")
     decision_match = re.search(
         r"## [45]\. (?:Review Decision|审核结论)\s+[\r\n]+- (?:审核结果:\s*)?(accepted|changes-requested|通过|需修改)",
         text,
     )
     if not decision_match:
         decision_match = re.search(r"- (?:Final decision|最终决策): (accepted|changes-requested|通过|需修改)", text)
+    if not decision_match:
+        decision_match = re.search(
+            r"-\s*(?:Review decision|审核决策|审核结果|ç€¹â„ƒç‰³éå´‡ç“¥):\s*(accepted|changes-requested|通过|需修改)",
+            text,
+            flags=re.IGNORECASE,
+        )
     task_match = re.search(r"- (?:Reviewed task_id|审核 task_id): (.+)", text)
     step_match = re.search(r"- (?:Reviewed step_number|审核 step_number|审核步骤序号): (\d+)", text)
+    if not step_match:
+        step_match = re.search(
+            r"-\s*(?:Reviewed step_number|审核 step_number|审核步骤序号|ç€¹â„ƒç‰³å§ãƒ©î€ƒæ´å¿“å½¿):\s*(\d+)",
+            text,
+            flags=re.IGNORECASE,
+        )
     action_kind_match = re.search(r"- (?:Review action kind|审核动作类型): (.+)", text)
     fallback_stage_match = re.search(r"- (?:Review fallback stage|审核回退阶段): (.+)", text)
     policy_reason_match = re.search(r"- (?:Review policy reason|审核策略原因): (.+)", text)
@@ -212,6 +229,10 @@ def extract_review_metadata(path: Path) -> dict[str, Any]:
         "fallback_stage": fallback_stage_match.group(1).strip() if fallback_stage_match else "",
         "policy_reason": policy_reason_match.group(1).strip() if policy_reason_match else "",
     }
+
+
+def extract_review_metadata(path: Path) -> dict[str, Any]:
+    return parse_review_metadata(load_text(path))
 
 
 def review_matches_step(review: dict[str, Any], step: dict[str, Any]) -> bool:
@@ -265,7 +286,7 @@ def route_feature(slug: str) -> dict[str, Any]:
             "flow": "feature",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "recommended_command": "cgc-plan",
             "reason": "当前功能开发工作流骨架不完整。",
             "next": "补齐或修复缺失的功能开发产物文件。",
@@ -277,7 +298,7 @@ def route_feature(slug: str) -> dict[str, Any]:
             "flow": "feature",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "recommended_command": "cgc-plan",
             "reason": "当前功能开发工作流已存在，但还不可执行。",
             "next": "继续细化设计，并补上有效的 CodeCGC 步骤契约。",
@@ -289,7 +310,7 @@ def route_feature(slug: str) -> dict[str, Any]:
             "flow": "feature",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "recommended_command": "cgc-plan",
             "reason": "当前功能开发清单里仍然存在仅规划用途的拆分或路由确认步骤。",
             "next": "先完成必须的拆分或路由澄清，再执行剩余的限定范围步骤。",
@@ -302,7 +323,7 @@ def route_feature(slug: str) -> dict[str, Any]:
             "flow": "feature",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "recommended_command": "cgc-plan",
             "reason": "当前功能开发清单仍以不可执行的占位步骤开头。",
             "next": "先澄清范围、归属和目标路径，再尝试执行该功能开发工作流。",
@@ -335,7 +356,7 @@ def route_feature(slug: str) -> dict[str, Any]:
                 "flow": "feature",
                 "slug": slug,
                 "artifact_class": artifact_class,
-                "directory": str(directory),
+                "directory": display_path(directory),
                 "review": review,
                 "current_step": None,
                 "audit_path": "",
@@ -348,7 +369,7 @@ def route_feature(slug: str) -> dict[str, Any]:
             "flow": "feature",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "review": review,
             "current_step": None,
             "audit_path": "",
@@ -363,6 +384,7 @@ def route_feature(slug: str) -> dict[str, Any]:
         "step_number": int(next_step.get("step_number", 0) or 0),
         "task_id": str(next_step.get("task_id", "")),
         "kind": str(next_step.get("kind", "")),
+        "step_type": str(next_step.get("step_type", "")),
         "target_paths": next_step.get("target_paths", []),
         "task_summary": str(next_step.get("task_summary", "")),
     }
@@ -372,7 +394,7 @@ def route_feature(slug: str) -> dict[str, Any]:
             "task_id": current_step["task_id"],
             "task_summary": current_step["task_summary"],
             "target_paths": current_step["target_paths"],
-            "step_type": "test" if "-test-step-" in current_step["task_id"] else "",
+            "step_type": current_step["step_type"] or ("test" if "-test-step-" in current_step["task_id"] else ""),
         }
     ):
         return {
@@ -380,25 +402,29 @@ def route_feature(slug: str) -> dict[str, Any]:
             "flow": "feature",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "review": review,
             "current_step": current_step,
-            "audit_path": str(audit_path) if audit_path else "",
+            "audit_path": display_path(audit_path),
             "recommended_command": "cgc-test",
             "reason": "当前功能开发工作流正在等待测试步骤执行。",
             "next": "执行当前测试步骤。",
         }
 
-    if review_for_current_step and review.get("decision") == "changes-requested":
+    if (
+        review_for_current_step
+        and review.get("decision") == "changes-requested"
+        and not (audit and audit_is_ready_for_review(audit, next_step))
+    ):
         return {
             "success": True,
             "flow": "feature",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "review": review,
             "current_step": current_step,
-            "audit_path": str(audit_path) if audit_path else "",
+            "audit_path": display_path(audit_path),
             "recommended_command": "cgc-build",
             "reason": "当前功能开发步骤在审核后仍需继续补充修改。",
             "next": "完成要求的后续修改后，重新执行当前功能开发步骤。",
@@ -411,10 +437,10 @@ def route_feature(slug: str) -> dict[str, Any]:
                 "flow": "feature",
                 "slug": slug,
                 "artifact_class": artifact_class,
-                "directory": str(directory),
+                "directory": display_path(directory),
                 "review": review,
                 "current_step": current_step,
-                "audit_path": str(audit_path) if audit_path else "",
+                "audit_path": display_path(audit_path),
                 "recommended_command": "cgc-review",
                 "reason": "当前功能开发步骤已有执行证据，但还没有对应的审核结论。",
                 "next": f"审核最新审计产物 {audit_path}，并回写验收结论。",
@@ -424,10 +450,10 @@ def route_feature(slug: str) -> dict[str, Any]:
             "flow": "feature",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "review": review,
             "current_step": current_step,
-            "audit_path": str(audit_path) if audit_path else "",
+            "audit_path": display_path(audit_path),
             "recommended_command": "cgc-build",
             "reason": "当前功能开发步骤还没有“通过”审核结论。",
             "next": "执行或继续推进当前待执行的功能开发步骤。",
@@ -438,7 +464,7 @@ def route_feature(slug: str) -> dict[str, Any]:
         "flow": "feature",
         "slug": slug,
         "artifact_class": artifact_class,
-        "directory": str(directory),
+        "directory": display_path(directory),
         "review": review,
         "current_step": current_step,
         "audit_path": "",
@@ -472,7 +498,7 @@ def route_issue(slug: str) -> dict[str, Any]:
             "flow": "issue",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "recommended_command": "cgc-plan",
             "reason": "Issue 工作流骨架不完整。",
             "next": "补齐或修复缺失的 issue 产物文件。",
@@ -484,7 +510,7 @@ def route_issue(slug: str) -> dict[str, Any]:
             "flow": "issue",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "recommended_command": "cgc-plan",
             "reason": "当前问题修复工作流已存在，但还不可执行。",
             "next": "继续细化修复范围，并补上有效的 CodeCGC 步骤契约。",
@@ -496,7 +522,7 @@ def route_issue(slug: str) -> dict[str, Any]:
             "flow": "issue",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "recommended_command": "cgc-plan",
             "reason": "当前问题修复清单里仍然存在仅规划用途的拆分或路由确认步骤。",
             "next": "先完成必须的拆分或路由澄清，再执行剩余的限定范围修复步骤。",
@@ -509,7 +535,7 @@ def route_issue(slug: str) -> dict[str, Any]:
             "flow": "issue",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "recommended_command": "cgc-plan",
             "reason": "当前问题修复清单仍以不可执行的占位步骤开头。",
             "next": "先澄清修复范围、归属和目标路径，再尝试执行该问题修复工作流。",
@@ -542,7 +568,7 @@ def route_issue(slug: str) -> dict[str, Any]:
                 "flow": "issue",
                 "slug": slug,
                 "artifact_class": artifact_class,
-                "directory": str(directory),
+                "directory": display_path(directory),
                 "review": review,
                 "current_step": None,
                 "audit_path": "",
@@ -555,7 +581,7 @@ def route_issue(slug: str) -> dict[str, Any]:
             "flow": "issue",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "review": review,
             "current_step": None,
             "audit_path": "",
@@ -570,6 +596,7 @@ def route_issue(slug: str) -> dict[str, Any]:
         "step_number": int(next_step.get("step_number", 0) or 0),
         "task_id": str(next_step.get("task_id", "")),
         "kind": str(next_step.get("kind", "")),
+        "step_type": str(next_step.get("step_type", "")),
         "target_paths": next_step.get("target_paths", []),
         "task_summary": str(next_step.get("task_summary", "")),
     }
@@ -579,7 +606,7 @@ def route_issue(slug: str) -> dict[str, Any]:
             "task_id": current_step["task_id"],
             "task_summary": current_step["task_summary"],
             "target_paths": current_step["target_paths"],
-            "step_type": "test" if "-test-step-" in current_step["task_id"] else "",
+            "step_type": current_step["step_type"] or ("test" if "-test-step-" in current_step["task_id"] else ""),
         }
     ):
         return {
@@ -587,25 +614,29 @@ def route_issue(slug: str) -> dict[str, Any]:
             "flow": "issue",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "review": review,
             "current_step": current_step,
-            "audit_path": str(audit_path) if audit_path else "",
+            "audit_path": display_path(audit_path),
             "recommended_command": "cgc-test",
             "reason": "当前问题修复工作流正在等待测试步骤执行。",
             "next": "执行当前测试步骤。",
         }
 
-    if review_for_current_step and review.get("decision") == "changes-requested":
+    if (
+        review_for_current_step
+        and review.get("decision") == "changes-requested"
+        and not (audit and audit_is_ready_for_review(audit, next_step))
+    ):
         return {
             "success": True,
             "flow": "issue",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "review": review,
             "current_step": current_step,
-            "audit_path": str(audit_path) if audit_path else "",
+            "audit_path": display_path(audit_path),
             "recommended_command": "cgc-fix",
             "reason": "当前问题修复步骤在审核后仍需继续补充修改。",
             "next": "完成要求的后续修复后，重新执行当前问题修复步骤。",
@@ -618,10 +649,10 @@ def route_issue(slug: str) -> dict[str, Any]:
                 "flow": "issue",
                 "slug": slug,
                 "artifact_class": artifact_class,
-                "directory": str(directory),
+                "directory": display_path(directory),
                 "review": review,
                 "current_step": current_step,
-                "audit_path": str(audit_path) if audit_path else "",
+                "audit_path": display_path(audit_path),
                 "recommended_command": "cgc-review",
                 "reason": "当前问题修复步骤已有执行证据，但还没有对应的审核结论。",
                 "next": f"审核最新审计产物 {audit_path}，并回写修复结论。",
@@ -631,10 +662,10 @@ def route_issue(slug: str) -> dict[str, Any]:
             "flow": "issue",
             "slug": slug,
             "artifact_class": artifact_class,
-            "directory": str(directory),
+            "directory": display_path(directory),
             "review": review,
             "current_step": current_step,
-            "audit_path": str(audit_path) if audit_path else "",
+            "audit_path": display_path(audit_path),
             "recommended_command": "cgc-fix",
             "reason": "当前问题修复步骤还没有“通过”审核结论。",
             "next": "执行或继续推进当前待执行的问题修复步骤。",
@@ -645,7 +676,7 @@ def route_issue(slug: str) -> dict[str, Any]:
         "flow": "issue",
         "slug": slug,
         "artifact_class": artifact_class,
-        "directory": str(directory),
+        "directory": display_path(directory),
         "review": review,
         "current_step": current_step,
         "audit_path": "",

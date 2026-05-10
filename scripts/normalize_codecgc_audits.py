@@ -6,6 +6,8 @@ from codecgc_artifact_roots import discover_flow_directory
 from codecgc_artifact_roots import flow_root
 from codecgc_artifact_roots import execution_root
 from codecgc_artifact_roots import normalize_artifact_class
+from codecgc_path_contract import normalize_audit_path_fields
+from codecgc_path_contract import normalize_persisted_project_path
 
 
 WORKSPACE = Path(__file__).resolve().parents[1]
@@ -35,11 +37,11 @@ def build_expected_artifact_file(source: dict[str, Any], artifact_class: str) ->
     artifact_slug = str(source.get("artifact_slug", "")).strip()
     if artifact_type not in {"feature", "issue"} or not artifact_slug:
         current = str(source.get("artifact_file", "")).strip()
-        return replace_repo_name(current) if current else current
+        return normalize_persisted_project_path(replace_repo_name(current)) if current else current
 
     base_slug = artifact_slug[11:] if len(artifact_slug) > 11 and artifact_slug[4] == "-" else artifact_slug
     checklist_name = f"{base_slug}-checklist.yaml" if artifact_type == "feature" else f"{base_slug}-fix.yaml"
-    return str(flow_root(artifact_type, artifact_class) / artifact_slug / checklist_name)
+    return normalize_persisted_project_path(flow_root(artifact_type, artifact_class) / artifact_slug / checklist_name)
 
 
 def normalize_audit_record(data: dict[str, Any]) -> tuple[dict[str, Any], str]:
@@ -55,7 +57,7 @@ def normalize_audit_record(data: dict[str, Any]) -> tuple[dict[str, Any], str]:
     source["artifact_file"] = build_expected_artifact_file(source, artifact_class)
     source["artifact_class"] = artifact_class
     data["source"] = source
-    return data, artifact_class
+    return normalize_audit_path_fields(data), artifact_class
 
 
 def normalize_file(path: Path) -> tuple[Path, bool]:
