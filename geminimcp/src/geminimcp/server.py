@@ -156,6 +156,29 @@ def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
     process.kill()
 
 
+GEMINI_JS_RELATIVE = Path("node_modules") / "@google" / "gemini-cli" / "bundle" / "gemini.js"
+
+
+def _resolve_gemini_command(cmd: list[str]) -> list[str]:
+    """Resolve the gemini CLI command, preferring direct node invocation on Windows."""
+    gemini_shim = shutil.which("gemini") or cmd[0]
+
+    if os.name == "nt":
+        shim_dir = Path(gemini_shim).parent
+        gemini_js = shim_dir / GEMINI_JS_RELATIVE
+        if gemini_js.is_file():
+            node_path = shutil.which("node") or "node"
+            return [node_path, str(gemini_js)] + cmd[1:]
+
+        if gemini_shim.lower().endswith((".cmd", ".bat")):
+            from subprocess import list2cmdline
+            cmd[0] = gemini_shim
+            return ["cmd.exe", "/s", "/c", list2cmdline(cmd)]
+
+    cmd[0] = gemini_shim
+    return cmd
+
+
 def run_shell_command(
     cmd: list[str],
     cwd: str | None = None,
@@ -171,14 +194,7 @@ def run_shell_command(
     Yields:
         Output lines from the command
     """
-    popen_cmd = cmd
-
-    gemini_path = shutil.which("gemini") or cmd[0]
-    popen_cmd[0] = gemini_path
-
-    if os.name == "nt" and gemini_path.lower().endswith((".cmd", ".bat")):
-        from subprocess import list2cmdline
-        popen_cmd = ["cmd.exe", "/s", "/c", list2cmdline(cmd)]
+    popen_cmd = _resolve_gemini_command(cmd)
 
     process = subprocess.Popen(
         popen_cmd,
