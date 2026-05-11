@@ -34,7 +34,9 @@ DEFAULT_SHARED_PATHS = [
 DEFAULT_ORCHESTRATION_PATHS = [
     "codecgc/**",
     ".claude/commands/**",
-    ".claude/settings.json",
+    ".claude/settings.local.json",
+    ".codex/codecgcrc.json",
+    ".gemini/policies/**",
     ".mcp.json",
     "model-routing.yaml",
 ]

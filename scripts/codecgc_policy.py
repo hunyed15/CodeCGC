@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import shlex
 import sys
 from dataclasses import dataclass
 from fnmatch import fnmatch
@@ -27,6 +29,71 @@ class PathDecision:
     allowed: bool
     reason: str
     recommended_action: str
+
+
+@dataclass(frozen=True)
+class HookRequest:
+    tool_name: str
+    file_path: str
+    command: str
+
+
+EDIT_TOOL_NAMES = {"Edit", "Write", "MultiEdit"}
+SHELL_TOOL_NAMES = {"Bash", "PowerShell"}
+SHELL_DENIED_COMMAND_PATTERNS = (
+    r"\brm\s+-[^\n\r]*[rf]",
+    r"\bdel\s+",
+    r"\brmdir\s+",
+    r"\bremove-item\b",
+    r"\bset-content\b",
+    r"\badd-content\b",
+    r"\bout-file\b",
+    r"\bnew-item\b",
+    r"\bcopy-item\b",
+    r"\bmove-item\b",
+    r"\bgit\s+reset\s+--hard\b",
+    r"\bgit\s+clean\b",
+    r"\bpython\s+-c\b",
+    r"\bnode\s+-e\b",
+    r"\bpowershell(\.exe)?\s+-(command|encodedcommand)\b",
+    r"\bcmd(\.exe)?\s+/c\b",
+)
+SHELL_ALLOWED_COMMAND_PREFIXES = (
+    "git status",
+    "git diff",
+    "git log",
+    "git show",
+    "git branch",
+    "git rev-parse",
+    "git ls-files",
+    "git remote",
+    "rg",
+    "ls",
+    "dir",
+    "pwd",
+    "get-content",
+    "get-childitem",
+    "select-string",
+    "test-path",
+    "resolve-path",
+    "pytest",
+    "python -m pytest",
+    "python -m compileall",
+    "npm test",
+    "npm run test",
+    "npm run lint",
+    "npm run typecheck",
+    "npm run check",
+    "pnpm test",
+    "pnpm run test",
+    "pnpm run lint",
+    "pnpm run typecheck",
+    "yarn test",
+    "yarn lint",
+    "codex --help",
+    "gemini --help",
+    "gemini --version",
+)
 
 
 def normalize_path_text(path_text: str) -> str:
@@ -207,18 +274,111 @@ def validate_executor_target(kind: str, target_paths: list[str], policy: dict[st
     return result
 
 
-def parse_hook_payload(text: str) -> tuple[str, str]:
+def parse_hook_request(text: str) -> HookRequest:
     if not text.strip():
-        return "", ""
+        return HookRequest(tool_name="", file_path="", command="")
     payload = json.loads(text)
     if not isinstance(payload, dict):
-        return "", ""
+        return HookRequest(tool_name="", file_path="", command="")
     tool_name = str(payload.get("tool_name", "")).strip()
     tool_input = payload.get("tool_input", {})
     if not isinstance(tool_input, dict):
-        return tool_name, ""
+        return HookRequest(tool_name=tool_name, file_path="", command="")
     file_path = str(tool_input.get("file_path") or tool_input.get("path") or "").strip()
-    return tool_name, file_path
+    command = str(tool_input.get("command") or tool_input.get("script") or "").strip()
+    return HookRequest(tool_name=tool_name, file_path=file_path, command=command)
+
+
+def parse_hook_payload(text: str) -> tuple[str, str]:
+    request = parse_hook_request(text)
+    return request.tool_name, request.file_path
+
+
+def has_unquoted_shell_control_operator(command: str) -> bool:
+    in_single = False
+    in_double = False
+    escaped = False
+    for index, char in enumerate(command):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == "'" and not in_double:
+            in_single = not in_single
+            continue
+        if char == '"' and not in_single:
+            in_double = not in_double
+            continue
+        if in_single or in_double:
+            continue
+        if char in {"|", ";", ">", "<", "`", "&"}:
+            return True
+        if char == "$" and index + 1 < len(command) and command[index + 1] == "(":
+            return True
+    return False
+
+
+def normalize_shell_command_for_prefix(command: str) -> str:
+    try:
+        parts = shlex.split(command, posix=False)
+    except ValueError:
+        parts = command.split()
+    if not parts:
+        return ""
+
+    first = parts[0].strip().strip("'\"")
+    first_name = Path(first.replace("\\", "/")).name.lower()
+    for suffix in (".cmd", ".ps1", ".exe", ".bat"):
+        if first_name.endswith(suffix):
+            first_name = first_name[: -len(suffix)]
+            break
+    rest = " ".join(str(item).strip().strip("'\"").lower() for item in parts[1:])
+    return f"{first_name} {rest}".strip()
+
+
+def shell_prefix_matches(command: str, prefix: str) -> bool:
+    return command == prefix or command.startswith(f"{prefix} ")
+
+
+def is_codecgc_cli_shell_command(normalized_command: str) -> bool:
+    first = normalized_command.split(" ", 1)[0]
+    return first == "cgc" or first == "codecgc" or first.startswith("cgc-")
+
+
+def evaluate_shell_command(command: str, tool_name: str = "Bash") -> dict[str, Any]:
+    normalized_tool_name = str(tool_name or "").strip()
+    if not str(command or "").strip():
+        return {"allowed": True, "reason": "", "recommended_action": ""}
+
+    if has_unquoted_shell_control_operator(command):
+        return {
+            "allowed": False,
+            "reason": f"{normalized_tool_name} commands with shell control operators are not allowed for Claude",
+            "recommended_action": "route write work through /cgc or run a single read-only check",
+        }
+
+    lowered = command.lower()
+    if any(re.search(pattern, lowered) for pattern in SHELL_DENIED_COMMAND_PATTERNS):
+        return {
+            "allowed": False,
+            "reason": f"{normalized_tool_name} command looks like a direct write or destructive shell operation",
+            "recommended_action": "route implementation through /cgc so CodeCGC can dispatch Codex or Gemini",
+        }
+
+    normalized_command = normalize_shell_command_for_prefix(command)
+    if is_codecgc_cli_shell_command(normalized_command):
+        return {"allowed": True, "reason": "", "recommended_action": ""}
+
+    if any(shell_prefix_matches(normalized_command, prefix) for prefix in SHELL_ALLOWED_COMMAND_PREFIXES):
+        return {"allowed": True, "reason": "", "recommended_action": ""}
+
+    return {
+        "allowed": False,
+        "reason": f"{normalized_tool_name} command is outside the CodeCGC Claude shell allowlist",
+        "recommended_action": "use /cgc for write work, or use an allowed read-only/test command",
+    }
 
 
 def build_hook_response(allowed: bool, reason: str) -> dict[str, Any]:
@@ -247,11 +407,23 @@ def main() -> int:
         policy = load_policy(policy_path)
 
         if args.hook_check:
-            tool_name, file_path = parse_hook_payload(sys.stdin.read())
-            if tool_name not in {"Edit", "Write", "MultiEdit"} or not file_path:
+            request = parse_hook_request(sys.stdin.read())
+            if request.tool_name in SHELL_TOOL_NAMES:
+                result = evaluate_shell_command(request.command, request.tool_name)
+                if result["allowed"]:
+                    print_json(build_hook_response(True, ""))
+                    return 0
+                hook_reason = f"CodeCGC: {result['reason']}."
+                recommended = str(result.get("recommended_action", "")).strip()
+                if recommended:
+                    hook_reason += f" {recommended}."
+                print_json(build_hook_response(False, hook_reason))
+                return 0
+
+            if request.tool_name not in EDIT_TOOL_NAMES or not request.file_path:
                 print_json(build_hook_response(True, ""))
                 return 0
-            result = evaluate_paths([file_path], actor=args.actor, operation=args.operation, policy=policy)
+            result = evaluate_paths([request.file_path], actor=args.actor, operation=args.operation, policy=policy)
             decision = result["decisions"][0]
             reason = decision.get("reason", "")
             recommended = decision.get("recommended_action", "")

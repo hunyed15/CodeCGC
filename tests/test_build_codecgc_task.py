@@ -6,6 +6,7 @@ from build_codecgc_task import (
     normalize_string_list,
     resolve_optional_value,
     is_executable_codecgc_block,
+    build_tool_call,
 )
 
 
@@ -269,3 +270,53 @@ steps:
         assert payload["timeout_seconds"] == 0  # Not specified, defaults to 0
         assert payload["gemini_sandbox"] is True
         assert payload["source"]["step_number"] == 2
+
+    def test_build_frontend_tool_call_forwards_timeout_to_gemini(self, sample_checklist_file):
+        args = Mock()
+        args.checklist_file = str(sample_checklist_file)
+        args.step_number = 2
+        args.kind = "auto"
+        args.task_summary = None
+        args.target_path = None
+        args.constraint = None
+        args.acceptance = None
+        args.task_id = None
+        args.cd = None
+        args.routing_file = "model-routing.yaml"
+        args.session_id = None
+        args.model = None
+        args.profile = None
+        args.codex_sandbox = None
+        args.gemini_sandbox = None
+        args.return_all_messages = None
+
+        checklist_path = Path(sample_checklist_file)
+        checklist_text = checklist_path.read_text(encoding="utf-8")
+        checklist_path.write_text(
+            checklist_text.replace(
+                'target_paths: ["src/components/"]\n      gemini_sandbox: true',
+                'target_paths: ["src/components/"]\n      timeout_seconds: 240\n      gemini_sandbox: true',
+            ),
+            encoding="utf-8",
+        )
+        routing = {
+            "version": 2,
+            "orchestration_paths": [],
+            "docs_paths": [],
+            "frontend_paths": ["src/components/**"],
+            "backend_paths": ["src/api/**", "src/db/**"],
+            "test_paths": {"frontend": [], "backend": []},
+            "shared_paths": [],
+            "rules": {
+                "claude_allowed_owners": ["orchestration", "docs"],
+                "backend_executor": "codexmcp",
+                "frontend_executor": "geminimcp",
+                "shared_policy": "split-first",
+            },
+        }
+
+        payload = build_tool_call(args, routing)
+
+        assert payload["target"] == "frontend"
+        assert payload["timeout_seconds"] == 240
+        assert payload["tool_args"]["timeout_seconds"] == 240

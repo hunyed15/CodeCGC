@@ -18,6 +18,10 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import BeforeValidator, Field
 import shutil
 
+DEFAULT_GEMINI_APPROVAL_MODE = "auto_edit"
+DEFAULT_GEMINI_TIMEOUT_SECONDS = 600
+PROJECT_GEMINI_POLICY_RELATIVE_PATH = Path(".gemini") / "policies" / "codecgc-policy.toml"
+
 mcp = FastMCP("Gemini MCP Server-from guda.studio")
 
 # Mirror of model-routing.yaml backend_paths — keep these hints in sync with
@@ -47,6 +51,14 @@ BACKEND_FILE_HINTS = (
 def _normalize_path_text(path_value: Path | str) -> str:
     """Normalize a path-like value to a forward-slash string."""
     return str(path_value).replace("\\", "/").strip()
+
+
+def _resolve_project_gemini_policy(cd: Path) -> Path | None:
+    """Return the CodeCGC project-local Gemini policy if the workspace installed it."""
+    policy_path = cd / PROJECT_GEMINI_POLICY_RELATIVE_PATH
+    if policy_path.is_file():
+        return policy_path
+    return None
 
 
 def _is_probably_backend_path(path_value: Path | str) -> bool:
@@ -126,7 +138,29 @@ def _validate_frontend_target_paths(target_paths: List[Path]) -> tuple[bool, Lis
     return True, policy_checks, ""
 
 
-def run_shell_command(cmd: list[str], cwd: str | None = None) -> Generator[str, None, None]:
+def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
+    """Terminate a process and its children best-effort."""
+    if process.poll() is not None:
+        return
+
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return
+
+    process.kill()
+
+
+def run_shell_command(
+    cmd: list[str],
+    cwd: str | None = None,
+    timeout_seconds: int = DEFAULT_GEMINI_TIMEOUT_SECONDS,
+) -> Generator[str, None, None]:
     """Execute a command and stream its output line-by-line.
 
     Args:
@@ -158,6 +192,8 @@ def run_shell_command(cmd: list[str], cwd: str | None = None) -> Generator[str, 
 
     output_queue: queue.Queue[str | None] = queue.Queue()
     GRACEFUL_SHUTDOWN_DELAY = 0.3
+    started_at = time.monotonic()
+    timed_out = False
 
     def is_turn_completed(line: str) -> bool:
         """Check if the line indicates turn completion via JSON parsing."""
@@ -185,6 +221,11 @@ def run_shell_command(cmd: list[str], cwd: str | None = None) -> Generator[str, 
 
     # Yield lines while process is running
     while True:
+        if timeout_seconds > 0 and time.monotonic() - started_at > timeout_seconds:
+            timed_out = True
+            _terminate_process_tree(process)
+            break
+
         try:
             line = output_queue.get(timeout=0.5)
             if line is None:
@@ -197,7 +238,7 @@ def run_shell_command(cmd: list[str], cwd: str | None = None) -> Generator[str, 
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        process.kill()
+        _terminate_process_tree(process)
         process.wait()
     thread.join(timeout=5)
 
@@ -209,6 +250,13 @@ def run_shell_command(cmd: list[str], cwd: str | None = None) -> Generator[str, 
         except queue.Empty:
             break
 
+    if timed_out:
+        raise TimeoutError(
+            f"Gemini CLI timed out after {timeout_seconds} seconds. "
+            "This usually means the CLI was waiting for interactive approval, "
+            "network/authentication, or a long-running tool call."
+        )
+
 
 def _execute_gemini_session(
     *,
@@ -218,6 +266,7 @@ def _execute_gemini_session(
     session_id: str,
     return_all_messages: bool,
     model: str,
+    timeout_seconds: int = DEFAULT_GEMINI_TIMEOUT_SECONDS,
 ) -> Dict[str, Any]:
     """Execute Gemini CLI and return the parsed MCP response payload."""
     if not cd.exists():
@@ -229,7 +278,21 @@ def _execute_gemini_session(
     if os.name == "nt":
         prompt = windows_escape(prompt)
 
-    cmd = ["gemini", "--skip-trust", "--prompt", prompt, "-o", "stream-json"]
+    effective_timeout_seconds = int(timeout_seconds or 0) or DEFAULT_GEMINI_TIMEOUT_SECONDS
+    cmd = [
+        "gemini",
+        "--skip-trust",
+        "--approval-mode",
+        DEFAULT_GEMINI_APPROVAL_MODE,
+        "--prompt",
+        prompt,
+        "-o",
+        "stream-json",
+    ]
+
+    project_policy = _resolve_project_gemini_policy(cd)
+    if project_policy is not None:
+        cmd.extend(["--policy", project_policy.absolute().as_posix()])
 
     if sandbox:
         cmd.extend(["--sandbox"])
@@ -246,27 +309,36 @@ def _execute_gemini_session(
     err_message = ""
     thread_id: Optional[str] = None
 
-    for line in run_shell_command(cmd, cwd=cd.absolute().as_posix()):
-        try:
-            line_dict = json.loads(line.strip())
-            all_messages.append(line_dict)
-            item_type = line_dict.get("type", "")
-            item_role = line_dict.get("role", "")
-            if item_type == "message" and item_role == "assistant":
-                if (
-                    "The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n"
-                    in line_dict.get("content", "")
-                ):
-                    continue
-                agent_messages = agent_messages + line_dict.get("content", "")
-            if line_dict.get("session_id") is not None:
-                thread_id = line_dict.get("session_id")
-        except json.JSONDecodeError:
-            err_message += "\n\n[json decode error] " + line
-            continue
-        except Exception as error:
-            err_message += "\n\n[unexpected error] " + f"Unexpected error: {error}. Line: {line!r}"
-            break
+    try:
+        for line in run_shell_command(
+            cmd,
+            cwd=cd.absolute().as_posix(),
+            timeout_seconds=effective_timeout_seconds,
+        ):
+            try:
+                line_dict = json.loads(line.strip())
+                all_messages.append(line_dict)
+                item_type = line_dict.get("type", "")
+                item_role = line_dict.get("role", "")
+                if item_type == "message" and item_role == "assistant":
+                    if (
+                        "The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n"
+                        in line_dict.get("content", "")
+                    ):
+                        continue
+                    agent_messages = agent_messages + line_dict.get("content", "")
+                if line_dict.get("session_id") is not None:
+                    thread_id = line_dict.get("session_id")
+            except json.JSONDecodeError:
+                err_message += "\n\n[json decode error] " + line
+                continue
+            except Exception as error:
+                err_message += "\n\n[unexpected error] " + f"Unexpected error: {error}. Line: {line!r}"
+                success = False
+                break
+    except TimeoutError as error:
+        success = False
+        err_message += "\n\n[timeout] " + str(error)
 
     if thread_id is None:
         success = False
@@ -359,6 +431,10 @@ async def gemini(
         str,
         "The model to use for the gemini session. This parameter is strictly prohibited unless explicitly specified by the user.",
     ] = "",
+    timeout_seconds: Annotated[
+        int,
+        Field(description="Maximum Gemini CLI process runtime in seconds. Defaults to 600."),
+    ] = DEFAULT_GEMINI_TIMEOUT_SECONDS,
 ) -> Dict[str, Any]:
     """Execute a gemini CLI session and return the results."""
     return await asyncio.to_thread(
@@ -370,6 +446,7 @@ async def gemini(
             session_id=SESSION_ID,
             return_all_messages=return_all_messages,
             model=model,
+            timeout_seconds=timeout_seconds,
         )
     )
 
@@ -421,6 +498,10 @@ async def implement_frontend_task(
         str,
         "Optional model override. Only use when explicitly requested by the user.",
     ] = "",
+    timeout_seconds: Annotated[
+        int,
+        Field(description="Maximum Gemini CLI process runtime in seconds. Defaults to 600."),
+    ] = DEFAULT_GEMINI_TIMEOUT_SECONDS,
 ) -> Dict[str, Any]:
     """Execute a frontend-only Gemini task with CodeCGC policy checks."""
     valid, policy_checks, validation_error = _validate_frontend_target_paths(target_paths)
@@ -447,6 +528,7 @@ async def implement_frontend_task(
             session_id=SESSION_ID,
             return_all_messages=return_all_messages,
             model=model,
+            timeout_seconds=timeout_seconds,
         )
     )
 

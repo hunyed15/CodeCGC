@@ -1,6 +1,6 @@
 {
   "name": "@hunyed15/codecgc",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Claude-hosted multi-model workflow product shell for CodeCGC.",
   "license": "MIT",
   "type": "commonjs",
@@ -64,6 +64,7 @@
     "codecgc/compound/",
     "codecgc/reference/",
     "codecgc/roadmap/",
+    "codecgc/templates/",
     "codecgcmcp/pyproject.toml",
     "codecgcmcp/README.md",
     "codecgcmcp/src/codecgcmcp/*.py",

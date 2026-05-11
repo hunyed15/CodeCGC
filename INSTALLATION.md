@@ -48,11 +48,16 @@ cgc-install --mode local --workspace .
 .mcp.json
 model-routing.yaml
 .claude/
-  settings.json
+  settings.local.json
   hooks/
     route-edit.ps1
   commands/
     cgc*.md
+.codex/
+  codecgcrc.json
+.gemini/
+  policies/
+    codecgc-policy.toml
 codecgc/
   START_HERE.md
   features/

@@ -25,10 +25,14 @@ SETTINGS_PATH = CLAUDE_DIR / "settings.json"
 MCP_CONFIG_PATH = WORKSPACE / ".mcp.json"
 PROJECT_HOOK_PATH = HOOKS_DIR / "route-edit.ps1"
 PROJECT_ROUTING_PATH = WORKSPACE / "model-routing.yaml"
-EDIT_GUARDRAIL_MATCHER = "Edit|Write|MultiEdit"
-LEGACY_EDIT_GUARDRAIL_MATCHERS = {"Edit|Write"}
+PROJECT_TEMPLATES_DIR = WORKSPACE / "codecgc" / "templates"
+EDIT_GUARDRAIL_MATCHER = "Edit|Write|MultiEdit|Bash|PowerShell"
+LEGACY_EDIT_GUARDRAIL_MATCHERS = {"Edit|Write", "Edit|Write|MultiEdit"}
 PROJECT_ONBOARDING_RELATIVE_PATH = "codecgc/START_HERE.md"
 PROJECT_ONBOARDING_MARKER = "<!-- codecgc:onboarding:v1 -->"
+CLAUDE_SETTINGS_TEMPLATE = PROJECT_TEMPLATES_DIR / "claude" / "settings.local.json"
+CODEX_POLICY_TEMPLATE = PROJECT_TEMPLATES_DIR / "codex" / "codecgcrc.json"
+GEMINI_POLICY_TEMPLATE = PROJECT_TEMPLATES_DIR / "gemini" / "codecgc-policy.toml"
 
 
 DEFAULT_HOOKS = {
@@ -98,16 +102,24 @@ def get_workspace_paths(override_workspace: str = "") -> dict[str, Path]:
     root = resolve_workspace_root(override_workspace)
     claude_dir = root / ".claude"
     hooks_dir = claude_dir / "hooks"
+    codex_dir = root / ".codex"
+    gemini_dir = root / ".gemini"
     return {
         "root": root,
         "claude_dir": claude_dir,
         "hooks_dir": hooks_dir,
-        "settings": claude_dir / "settings.json",
+        "settings": claude_dir / "settings.local.json",
+        "legacy_settings": claude_dir / "settings.json",
         "mcp": root / ".mcp.json",
         "hook_script": hooks_dir / "route-edit.ps1",
         "commands_dir": claude_dir / "commands",
         "routing_file": root / "model-routing.yaml",
         "onboarding_file": root / PROJECT_ONBOARDING_RELATIVE_PATH,
+        "codex_dir": codex_dir,
+        "codex_policy": codex_dir / "codecgcrc.json",
+        "gemini_dir": gemini_dir,
+        "gemini_policies_dir": gemini_dir / "policies",
+        "gemini_policy": gemini_dir / "policies" / "codecgc-policy.toml",
     }
 
 
@@ -121,6 +133,12 @@ def load_text_file(path: Path) -> str:
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8")
+
+
+def copy_template_file(template_path: Path, target_path: Path) -> Path:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(template_path, target_path)
+    return target_path
 
 
 def ensure_workspace_workflow_dirs(workspace_root: Path) -> list[str]:
@@ -174,9 +192,11 @@ cgc "新增一个登录页面，放在 src/components/LoginForm.tsx"
 ```text
 .mcp.json
 model-routing.yaml
-.claude/settings.json
+.claude/settings.local.json
 .claude/hooks/route-edit.ps1
 .claude/commands/cgc*.md
+.codex/codecgcrc.json
+.gemini/policies/codecgc-policy.toml
 codecgc/features/
 codecgc/issues/
 codecgc/execution/
@@ -657,6 +677,16 @@ def write_json_file(path: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+def build_project_claude_settings(workspace_paths: dict[str, Path]) -> dict[str, Any]:
+    settings = load_json_file(CLAUDE_SETTINGS_TEMPLATE)
+    merged_settings, _ = merge_hook_settings(
+        settings,
+        build_workspace_hook_command(workspace_paths),
+    )
+    merged_settings, _ = merge_permission_settings(merged_settings, DEFAULT_ALLOWED_TOOLS)
+    return merged_settings
+
+
 def shell_quote(value: str) -> str:
     text = str(value)
     if not text:
@@ -851,16 +881,12 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
     workspace_paths["hooks_dir"].mkdir(parents=True, exist_ok=True)
     workflow_dirs = ensure_workspace_workflow_dirs(workspace_paths["root"])
 
-    settings = load_json_file(workspace_paths["settings"])
-    merged_settings, settings_changed = merge_hook_settings(
-        settings,
-        build_workspace_hook_command(workspace_paths),
+    write_json_file(
+        workspace_paths["settings"],
+        build_project_claude_settings(workspace_paths),
     )
-    merged_settings, permissions_changed = merge_permission_settings(merged_settings, DEFAULT_ALLOWED_TOOLS)
-    if settings_changed or not workspace_paths["settings"].exists():
-        write_json_file(workspace_paths["settings"], merged_settings)
-    elif permissions_changed:
-        write_json_file(workspace_paths["settings"], merged_settings)
+    codex_policy_path = copy_template_file(CODEX_POLICY_TEMPLATE, workspace_paths["codex_policy"])
+    gemini_policy_path = copy_template_file(GEMINI_POLICY_TEMPLATE, workspace_paths["gemini_policy"])
 
     if PROJECT_HOOK_PATH.resolve() != workspace_paths["hook_script"].resolve():
         shutil.copyfile(PROJECT_HOOK_PATH, workspace_paths["hook_script"])
@@ -880,6 +906,8 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
         "mcp_config": str(mcp_path),
         "routing_file": str(routing_path),
         "claude_settings": str(workspace_paths["settings"]),
+        "codex_policy": str(codex_policy_path),
+        "gemini_policy": str(gemini_policy_path),
         "hook_script": str(workspace_paths["hook_script"]),
         "commands_dir": str(workspace_paths["commands_dir"]),
         "onboarding_file": str(onboarding_file),
@@ -890,7 +918,9 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
             "Project-local model-routing.yaml was synchronized as the policy source of truth.",
             "Project-local codecgc workflow directories were initialized.",
             "Claude pre-edit guardrail hook was synchronized into the target workspace.",
-            "Claude MCP tool permissions were merged into project .claude/settings.json.",
+            "Claude project permissions were rendered from codecgc/templates/claude/settings.local.json.",
+            "Project-local Codex policy contract was synchronized into .codex/codecgcrc.json.",
+            "Project-local Gemini policy was synchronized into .gemini/policies/codecgc-policy.toml.",
             "Project-local Claude slash commands were synchronized into .claude/commands.",
             "Project-local codecgc/START_HERE.md was written as the first-run entry guide.",
             "This mode prepares project-level integration surfaces for the selected workspace.",
@@ -1026,6 +1056,8 @@ def build_install_mode_summary(result: dict[str, Any]) -> str:
             f"- MCP 配置: {result.get('mcp_config', '')}",
             f"- Routing 文件: {result.get('routing_file', '')}",
             f"- Claude 设置: {result.get('claude_settings', '')}",
+            f"- Codex 策略: {result.get('codex_policy', '')}",
+            f"- Gemini 策略: {result.get('gemini_policy', '')}",
             f"- Hook 脚本: {result.get('hook_script', '')}",
             f"- Slash Commands: {result.get('commands_dir', '')}",
             f"- 新手入口: {result.get('onboarding_file', '')}",
@@ -1084,9 +1116,14 @@ def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
     expected_mcp = build_mcp_config(workspace_paths["root"])
     expected_hook_command = build_workspace_hook_command(workspace_paths)
     expected_hook_text = load_text_file(PROJECT_HOOK_PATH)
+    expected_settings = build_project_claude_settings(workspace_paths)
+    expected_codex_policy = load_text_file(CODEX_POLICY_TEMPLATE)
+    expected_gemini_policy = load_text_file(GEMINI_POLICY_TEMPLATE)
     current_settings = load_json_file(workspace_paths["settings"])
     current_mcp = load_json_file(workspace_paths["mcp"])
     current_hook_text = load_text_file(workspace_paths["hook_script"])
+    current_codex_policy = load_text_file(workspace_paths["codex_policy"])
+    current_gemini_policy = load_text_file(workspace_paths["gemini_policy"])
     routing_exists = workspace_paths["routing_file"].exists()
     policy_valid = policy_file_is_valid(workspace_paths["routing_file"]) if routing_exists else False
     workflow_dirs_ready = workspace_workflow_dirs_ready(workspace_paths["root"])
@@ -1094,8 +1131,15 @@ def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
 
     hook_registered = settings_have_hook_command(current_settings, expected_hook_command)
     permissions_registered = settings_have_allowed_tools(current_settings, DEFAULT_ALLOWED_TOOLS)
+    settings_matches = current_settings == expected_settings if workspace_paths["settings"].exists() else False
     mcp_matches = current_mcp == expected_mcp if workspace_paths["mcp"].exists() else False
     hook_file_matches = current_hook_text == expected_hook_text if workspace_paths["hook_script"].exists() else False
+    codex_policy_matches = (
+        current_codex_policy == expected_codex_policy if workspace_paths["codex_policy"].exists() else False
+    )
+    gemini_policy_matches = (
+        current_gemini_policy == expected_gemini_policy if workspace_paths["gemini_policy"].exists() else False
+    )
 
     missing = []
     if not routing_exists:
@@ -1106,6 +1150,8 @@ def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
         missing.append("workflow_dirs")
     if not mcp_matches:
         missing.append("mcp_json")
+    if not settings_matches:
+        missing.append("claude_settings_local")
     if not hook_registered:
         missing.append("claude_settings_hook")
     if not permissions_registered:
@@ -1114,12 +1160,19 @@ def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
         missing.append("hook_script")
     if not onboarding_ready:
         missing.append("onboarding_file")
+    if not codex_policy_matches:
+        missing.append("codex_policy")
+    if not gemini_policy_matches:
+        missing.append("gemini_policy")
 
     ready = not missing
     return {
         "mcp_json_path": str(workspace_paths["mcp"]),
         "routing_file_path": str(workspace_paths["routing_file"]),
         "claude_settings_path": str(workspace_paths["settings"]),
+        "legacy_claude_settings_path": str(workspace_paths["legacy_settings"]),
+        "codex_policy_path": str(workspace_paths["codex_policy"]),
+        "gemini_policy_path": str(workspace_paths["gemini_policy"]),
         "hook_script_path": str(workspace_paths["hook_script"]),
         "onboarding_file_path": str(workspace_paths["onboarding_file"]),
         "mcp_json_exists": workspace_paths["mcp"].exists(),
@@ -1129,12 +1182,18 @@ def collect_project_status(workspace_paths: dict[str, Path]) -> dict[str, Any]:
         "onboarding_ready": onboarding_ready,
         "workflow_dirs_expected": [str(workspace_paths["root"] / item) for item in PROJECT_WORKFLOW_DIRS],
         "claude_settings_exists": workspace_paths["settings"].exists(),
+        "legacy_claude_settings_exists": workspace_paths["legacy_settings"].exists(),
+        "codex_policy_exists": workspace_paths["codex_policy"].exists(),
+        "gemini_policy_exists": workspace_paths["gemini_policy"].exists(),
         "hook_exists": workspace_paths["hook_script"].exists(),
         "onboarding_exists": workspace_paths["onboarding_file"].exists(),
         "mcp_matches_expected": mcp_matches,
+        "claude_settings_matches_expected": settings_matches,
         "hook_registered": hook_registered,
         "permissions_registered": permissions_registered,
         "hook_file_matches_expected": hook_file_matches,
+        "codex_policy_matches_expected": codex_policy_matches,
+        "gemini_policy_matches_expected": gemini_policy_matches,
         "ready": ready,
         "missing_or_outdated": missing,
         "recommended_command": "" if ready else build_workspace_install_command(workspace_paths["root"]),

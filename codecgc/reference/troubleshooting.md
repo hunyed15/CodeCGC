@@ -45,7 +45,7 @@ The generated file is `codecgc/START_HERE.md`. It should use project-relative pa
 
 ## Claude Hook Blocks A Write
 
-The hook is a guardrail. It blocks Claude direct writes to product source paths that should belong to Codex or Gemini.
+The hook is a guardrail. It blocks Claude direct writes to product source paths that should belong to Codex or Gemini, including direct shell writes through `Bash` or `PowerShell`.
 
 Expected behavior:
 
@@ -55,6 +55,8 @@ Expected behavior:
 - Mixed ownership must be split before execution.
 
 If a write was blocked incorrectly, inspect `model-routing.yaml` first. It is the project-local policy source.
+
+For shell commands, use `/cgc` or `cgc` for implementation work. The hook only allows CodeCGC entry commands, read-only inspection commands, and test/check commands.
 
 ## Codex Or Gemini Is Unavailable
 

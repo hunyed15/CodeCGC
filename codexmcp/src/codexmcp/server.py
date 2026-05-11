@@ -51,6 +51,8 @@ FRONTEND_FILE_SUFFIXES = (
     ".svelte",
 )
 
+PROJECT_CODEX_POLICY_RELATIVE_PATH = Path(".codex") / "codecgcrc.json"
+
 
 def _empty_str_to_none(value: str | None) -> str | None:
     """Convert empty strings to None for optional UUID parameters."""
@@ -62,6 +64,45 @@ def _empty_str_to_none(value: str | None) -> str | None:
 def _normalize_path_text(path_value: Path | str) -> str:
     """Normalize a path-like value to a forward-slash string."""
     return str(path_value).replace("\\", "/").strip()
+
+
+def _load_project_codex_policy_context(cd: Path) -> str:
+    """Load the CodeCGC project-local Codex policy contract as prompt context."""
+    policy_path = cd / PROJECT_CODEX_POLICY_RELATIVE_PATH
+    if not policy_path.is_file():
+        return ""
+
+    try:
+        payload = json.loads(policy_path.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+
+    if not isinstance(payload, dict):
+        return ""
+
+    enforcement = payload.get("enforcement")
+    if not isinstance(enforcement, dict):
+        enforcement = {}
+
+    allowed_path_kinds = payload.get("allowed_path_kinds")
+    denied_path_kinds = payload.get("denied_path_kinds")
+    notes = payload.get("notes")
+
+    lines = [
+        "Project CodeCGC Codex policy contract:",
+        f"- Role: {payload.get('role', 'backend implementation and backend tests')}",
+        f"- Routing policy: {enforcement.get('routing_policy', 'model-routing.yaml')}",
+        f"- Primary enforcement: {enforcement.get('primary', 'CodeCGC MCP backend path validation')}",
+        f"- Codex CLI guardrail: {enforcement.get('codex_cli', 'sandbox and approval flags supplied by codexmcp')}",
+    ]
+    if isinstance(allowed_path_kinds, list):
+        lines.append("- Allowed path kinds: " + ", ".join(str(item) for item in allowed_path_kinds))
+    if isinstance(denied_path_kinds, list):
+        lines.append("- Denied path kinds: " + ", ".join(str(item) for item in denied_path_kinds))
+    if isinstance(notes, list):
+        lines.extend(f"- {str(item)}" for item in notes if str(item).strip())
+    lines.append("Follow this project policy before making any code change.")
+    return "\n".join(lines).strip()
 
 
 def _is_probably_frontend_path(path_value: Path | str) -> bool:
@@ -254,6 +295,10 @@ def _execute_codex_session(
 
     if session_id:
         cmd.extend(["resume", str(session_id)])
+
+    policy_context = _load_project_codex_policy_context(cd)
+    if policy_context:
+        prompt = f"{policy_context}\n\nUser task:\n{prompt}"
 
     if os.name == "nt":
         prompt = windows_escape(prompt)

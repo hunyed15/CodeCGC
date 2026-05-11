@@ -14,6 +14,8 @@ Claude /cgc -> CodeCGC MCP -> CodeCGC runtime -> Codex 或 Gemini 执行器
 
 CLI 仍然保留，用于本地调试、CI 检查和 MCP 不可用时的回退执行。普通用户优先使用 Claude 内的 `/cgc`，或在命令行使用 `cgc`，不需要记住所有内部子命令。
 
+安全边界：Claude 可以维护需求、规划、文档、审查和工作流状态；产品代码实现必须经由 CodeCGC 路由到 Codex 或 Gemini。项目 hook 会拦截 `Edit`、`Write`、`MultiEdit`、`Bash` 和 `PowerShell`，防止 Claude 用直接编辑或 shell 写入绕过路由。
+
 ## 安装
 
 全局安装 CLI：
@@ -53,11 +55,16 @@ cgc-doctor
 .mcp.json
 model-routing.yaml
 .claude/
-  settings.json
+  settings.local.json
   hooks/
     route-edit.ps1
   commands/
     cgc*.md
+.codex/
+  codecgcrc.json
+.gemini/
+  policies/
+    codecgc-policy.toml
 codecgc/
   START_HERE.md
   features/
@@ -72,7 +79,7 @@ codecgc/
   fixtures/
 ```
 
-在 CodeCGC 源码仓库中，`.mcp.json`、`.claude/settings.json`、`.claude/commands/`、`codecgc/START_HERE.md` 以及实时 workflow 输出目录会被忽略，因为它们是机器相关或项目安装生成的内容。
+在 CodeCGC 源码仓库中，`.mcp.json`、`.claude/settings.local.json`、`.claude/commands/`、`.codex/`、`.gemini/`、`codecgc/START_HERE.md` 以及实时 workflow 输出目录会被忽略，因为它们是机器相关或项目安装生成的内容。
 
 源码仓库会保留可发布运行时、参考文档、命令模板、测试 fixtures，以及 `.claude/hooks/route-edit.ps1` 这个 hook 模板。
 
@@ -149,7 +156,7 @@ python scripts\audit_codecgc_release_readiness.py --format json
 npm pack --dry-run --json
 ```
 
-`cgc-release-readiness` 会通过临时项目安装探针验证发布包可用性。源码仓库本身不需要提交项目级 `.mcp.json` 或 `.claude/settings.json`。
+`cgc-release-readiness` 会通过临时项目安装探针验证发布包可用性。源码仓库本身不需要提交项目级 `.mcp.json`、`.claude/settings.local.json`、`.codex/` 或 `.gemini/`。
 
 如果运行环境限制默认临时目录写入，可以显式指定探针目录：
 

@@ -44,7 +44,9 @@ CodeCGC 把“工作流控制”和“代码执行”明确分层。
 运行时 guardrail 主要声明在：
 
 - `.mcp.json`
-- `.claude/settings.json`
+- `.claude/settings.local.json`
+- `.codex/codecgcrc.json`
+- `.gemini/policies/codecgc-policy.toml`
 - `.claude/hooks/route-edit.ps1`
 
 这些文件一起负责“不能越界”。

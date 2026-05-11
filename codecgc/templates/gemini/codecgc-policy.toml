@@ -1,0 +1,47 @@
+# CodeCGC project-local Gemini policy.
+#
+# This file is passed explicitly by GeminiMCP through `gemini --policy`.
+# It is intentionally project-local so each repository can review and tune it.
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = [
+  "rm -rf",
+  "del ",
+  "rmdir ",
+  "Remove-Item",
+  "git reset --hard",
+  "git clean"
+]
+decision = "deny"
+priority = 900
+denyMessage = "CodeCGC blocks destructive shell commands in Gemini executor sessions."
+
+[[rule]]
+toolName = [
+  "write_file",
+  "replace"
+]
+decision = "allow"
+priority = 500
+modes = ["autoEdit"]
+
+[rule.safety_checker]
+type = "in-process"
+name = "allowed-path"
+required_context = ["environment"]
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = [
+  "npm test",
+  "npm run test",
+  "pnpm test",
+  "pnpm run test",
+  "yarn test",
+  "git diff",
+  "git status"
+]
+decision = "allow"
+priority = 300
+modes = ["autoEdit"]

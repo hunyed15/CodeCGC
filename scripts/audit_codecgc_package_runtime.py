@@ -22,6 +22,9 @@ RUNTIME_ENTRYPOINTS = [
 
 RUNTIME_STATIC_REQUIREMENTS = [
     ".claude/hooks/route-edit.ps1",
+    "codecgc/templates/claude/settings.local.json",
+    "codecgc/templates/codex/codecgcrc.json",
+    "codecgc/templates/gemini/codecgc-policy.toml",
     "model-routing.yaml",
     "requirements.txt",
     "scripts/codecgc_runtime/__init__.py",

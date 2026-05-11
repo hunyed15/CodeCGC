@@ -209,6 +209,7 @@ def load_explicit_task_payload(args: argparse.Namespace) -> dict[str, Any]:
         "codex_sandbox": args.codex_sandbox or "workspace-write",
         "gemini_sandbox": bool(args.gemini_sandbox),
         "return_all_messages": bool(args.return_all_messages),
+        "timeout_seconds": int(getattr(args, "timeout_seconds", 0) or 0),
         "source": None,
     }
 
@@ -345,6 +346,10 @@ def build_tool_call(args: argparse.Namespace, routing: dict[str, Any]) -> dict[s
             + json.dumps(policy_result, ensure_ascii=False)
         )
 
+    effective_timeout_seconds = int(payload_inputs.get("timeout_seconds", 0)) or int(
+        getattr(args, "timeout_seconds", 0) or 0
+    )
+
     if kind == "frontend":
         tool_name = "implement_frontend_task"
         tool_args: dict[str, Any] = {
@@ -358,6 +363,7 @@ def build_tool_call(args: argparse.Namespace, routing: dict[str, Any]) -> dict[s
             "sandbox": payload_inputs["gemini_sandbox"],
             "return_all_messages": payload_inputs["return_all_messages"],
             "model": payload_inputs["model"],
+            "timeout_seconds": effective_timeout_seconds,
         }
     elif kind == "backend":
         tool_name = "implement_backend_task"
@@ -382,6 +388,7 @@ def build_tool_call(args: argparse.Namespace, routing: dict[str, Any]) -> dict[s
         "target": kind,
         "tool_name": tool_name,
         "tool_args": tool_args,
+        "timeout_seconds": effective_timeout_seconds,
         "route_notes": route_notes,
         "policy": policy_result,
         "routing_file": payload_inputs["routing_file"],

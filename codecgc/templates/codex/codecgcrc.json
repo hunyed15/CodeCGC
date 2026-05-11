@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "owner": "CodeCGC",
+  "scope": "project",
+  "executor": "codex",
+  "role": "backend implementation and backend tests",
+  "enforcement": {
+    "primary": "CodeCGC MCP backend path validation",
+    "codex_cli": "sandbox and approval flags supplied by codexmcp",
+    "routing_policy": "model-routing.yaml"
+  },
+  "allowed_path_kinds": [
+    "backend"
+  ],
+  "denied_path_kinds": [
+    "frontend"
+  ],
+  "notes": [
+    "Codex CLI project execpolicy discovery is version dependent; CodeCGC treats this file as the project-local policy contract used by its MCP wrapper and status checks.",
+    "Do not edit frontend files, styling files, UI components, or mixed shared paths without a split plan."
+  ]
+}

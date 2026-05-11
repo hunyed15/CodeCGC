@@ -31,9 +31,11 @@ The project install syncs:
 ```text
 .mcp.json
 model-routing.yaml
-.claude/settings.json
+.claude/settings.local.json
 .claude/hooks/route-edit.ps1
 .claude/commands/cgc*.md
+.codex/codecgcrc.json
+.gemini/policies/codecgc-policy.toml
 codecgc/START_HERE.md
 codecgc/
 ```

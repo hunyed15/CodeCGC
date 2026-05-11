@@ -1,8 +1,12 @@
 .ace-tool/
 .github/
-.claude/*
+.claude/settings.json
+.claude/settings.local.json
+.claude/commands/
 !.claude/hooks/
 !.claude/hooks/route-edit.ps1
+.codex/
+.gemini/
 backend/
 frontend/
 codecgc/features/

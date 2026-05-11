@@ -1,6 +1,7 @@
 import pytest
 
 from codecgc_policy import classify_path
+from codecgc_policy import evaluate_shell_command
 from codecgc_policy import evaluate_paths
 from codecgc_policy import load_policy
 from codecgc_policy import parse_hook_payload
@@ -138,3 +139,22 @@ def test_parse_hook_payload_supports_multiedit():
 
     assert tool_name == "MultiEdit"
     assert file_path == "apps/api/src/user.py"
+
+
+def test_evaluate_shell_command_allows_codecgc_and_readonly_commands():
+    assert evaluate_shell_command("cgc-status")["allowed"] is True
+    assert evaluate_shell_command("cgc \"新增登录页\"")["allowed"] is True
+    assert evaluate_shell_command("git status --short")["allowed"] is True
+    assert evaluate_shell_command("python -m pytest tests")["allowed"] is True
+
+
+def test_evaluate_shell_command_blocks_write_and_chained_commands():
+    redirect_result = evaluate_shell_command("echo hacked > apps/api/src/user.py")
+    write_result = evaluate_shell_command("Set-Content apps/api/src/user.py hacked", "PowerShell")
+    arbitrary_result = evaluate_shell_command("python -c \"open('x.py','w').write('x')\"")
+
+    assert redirect_result["allowed"] is False
+    assert "control operators" in redirect_result["reason"]
+    assert write_result["allowed"] is False
+    assert "direct write" in write_result["reason"]
+    assert arbitrary_result["allowed"] is False

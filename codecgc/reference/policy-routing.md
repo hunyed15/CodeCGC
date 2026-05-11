@@ -44,11 +44,12 @@ This creates project-local `.mcp.json`, `.claude/`, `model-routing.yaml`, and th
 `scripts/codecgc_policy.py` evaluates the policy for every entry point that needs write ownership:
 
 - Claude hook guardrail via `.claude/hooks/route-edit.ps1` for `Edit`, `Write`, and `MultiEdit`
+- Claude shell guardrail via the same hook for `Bash` and `PowerShell`
 - task payload construction via `scripts/build_codecgc_task.py`
 - build/fix/test wrappers before executor dispatch
 - status and doctor checks through `model-routing.yaml` validation
 
-The hook is intentionally thin. It only forwards Claude edit requests to the shared policy checker.
+The hook is intentionally thin. It forwards Claude edit requests to the shared policy checker, and it only allows Claude shell commands that are CodeCGC entry commands, read-only inspection commands, or test/check commands. Direct shell writes, destructive commands, redirection, pipes, and chained shell commands are denied so Claude cannot bypass CodeCGC routing.
 
 ## Shared Paths
 
