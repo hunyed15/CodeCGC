@@ -176,9 +176,9 @@ def run_shell_command(
     gemini_path = shutil.which("gemini") or cmd[0]
     popen_cmd[0] = gemini_path
 
-    # if os.name == "nt" and gemini_path.lower().endswith((".cmd", ".bat")):
-    #     from subprocess import list2cmdline
-    #     popen_cmd = ["cmd.exe", "/s", "/c", list2cmdline(cmd)]
+    if os.name == "nt" and gemini_path.lower().endswith((".cmd", ".bat")):
+        from subprocess import list2cmdline
+        popen_cmd = ["cmd.exe", "/s", "/c", list2cmdline(cmd)]
 
     process = subprocess.Popen(
         popen_cmd,
@@ -286,8 +286,12 @@ def _execute_gemini_session(
         "--skip-trust",
         "--approval-mode",
         DEFAULT_GEMINI_APPROVAL_MODE,
+        "--prompt",
+        prompt,
         "-o",
         "stream-json",
+        "--allowed-mcp-server-names",
+        "__codecgc_none__",
     ]
 
     project_policy = _resolve_project_gemini_policy(cd)
@@ -302,8 +306,6 @@ def _execute_gemini_session(
 
     if session_id:
         cmd.extend(["--resume", session_id])
-
-    cmd.append(prompt)
 
     gemini_env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
 

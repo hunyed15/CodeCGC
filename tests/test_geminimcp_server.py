@@ -35,8 +35,7 @@ def test_execute_gemini_session_uses_non_interactive_edit_mode(monkeypatch, tmp_
     assert result["SESSION_ID"] == "gemini-session"
     assert "--approval-mode" in captured["cmd"]
     assert captured["cmd"][captured["cmd"].index("--approval-mode") + 1] == "yolo"
-    assert "--prompt" not in captured["cmd"]
-    assert captured["cmd"][-1] == "Write a file."
+    assert "--prompt" in captured["cmd"]
     assert captured["env"]["GEMINI_CLI_TRUST_WORKSPACE"] == "true"
     assert captured["timeout_seconds"] == 123
     assert captured["cwd"] == tmp_path.absolute().as_posix()
