@@ -2,21 +2,53 @@
 #
 # This file is passed explicitly by GeminiMCP through `gemini --policy`.
 # It is intentionally project-local so each repository can review and tune it.
+#
+# In yolo approval mode, all tools are auto-approved by default.
+# These DENY rules act as safety guardrails to block dangerous operations.
 
+# --- DENY: destructive shell commands (highest priority) ---
 [[rule]]
 toolName = "run_shell_command"
 commandPrefix = [
   "rm -rf",
-  "del ",
+  "del /",
+  "del \\",
+  "rmdir /s",
   "rmdir ",
   "Remove-Item",
   "git reset --hard",
-  "git clean"
+  "git clean",
+  "git push --force",
+  "git push -f",
+  "format ",
+  "shutdown",
+  "reboot",
+  "taskkill",
+  "net stop",
+  "net user",
+  "reg delete",
+  "reg add",
 ]
 decision = "deny"
 priority = 900
 denyMessage = "CodeCGC blocks destructive shell commands in Gemini executor sessions."
 
+# --- DENY: network / exfiltration commands ---
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = [
+  "curl ",
+  "wget ",
+  "Invoke-WebRequest",
+  "Invoke-RestMethod",
+  "ssh ",
+  "scp ",
+]
+decision = "deny"
+priority = 800
+denyMessage = "CodeCGC blocks network commands in Gemini executor sessions."
+
+# --- ALLOW: file editing tools ---
 [[rule]]
 toolName = [
   "write_file",
@@ -24,24 +56,32 @@ toolName = [
 ]
 decision = "allow"
 priority = 500
-modes = ["autoEdit"]
 
-[rule.safety_checker]
-type = "in-process"
-name = "allowed-path"
-required_context = ["environment"]
-
+# --- ALLOW: common dev commands (defense-in-depth) ---
 [[rule]]
 toolName = "run_shell_command"
 commandPrefix = [
   "npm test",
-  "npm run test",
-  "pnpm test",
-  "pnpm run test",
-  "yarn test",
+  "npm run",
+  "npm install",
+  "npx ",
+  "pnpm ",
+  "yarn ",
+  "node ",
+  "tsc",
+  "eslint",
+  "prettier",
   "git diff",
-  "git status"
+  "git status",
+  "git log",
+  "cat ",
+  "type ",
+  "ls ",
+  "dir ",
+  "head ",
+  "tail ",
+  "find ",
+  "grep ",
 ]
 decision = "allow"
 priority = 300
-modes = ["autoEdit"]

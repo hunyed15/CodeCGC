@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import BeforeValidator, Field
 import shutil
 
-DEFAULT_GEMINI_APPROVAL_MODE = "auto_edit"
+DEFAULT_GEMINI_APPROVAL_MODE = "yolo"
 DEFAULT_GEMINI_TIMEOUT_SECONDS = 600
 PROJECT_GEMINI_POLICY_RELATIVE_PATH = Path(".gemini") / "policies" / "codecgc-policy.toml"
 
@@ -160,6 +160,7 @@ def run_shell_command(
     cmd: list[str],
     cwd: str | None = None,
     timeout_seconds: int = DEFAULT_GEMINI_TIMEOUT_SECONDS,
+    env: dict[str, str] | None = None,
 ) -> Generator[str, None, None]:
     """Execute a command and stream its output line-by-line.
 
@@ -188,6 +189,7 @@ def run_shell_command(
         universal_newlines=True,
         encoding='utf-8',
         cwd=cwd,
+        env=env,
     )
 
     output_queue: queue.Queue[str | None] = queue.Queue()
@@ -284,8 +286,6 @@ def _execute_gemini_session(
         "--skip-trust",
         "--approval-mode",
         DEFAULT_GEMINI_APPROVAL_MODE,
-        "--prompt",
-        prompt,
         "-o",
         "stream-json",
     ]
@@ -303,6 +303,10 @@ def _execute_gemini_session(
     if session_id:
         cmd.extend(["--resume", session_id])
 
+    cmd.append(prompt)
+
+    gemini_env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
+
     all_messages = []
     agent_messages = ""
     success = True
@@ -314,6 +318,7 @@ def _execute_gemini_session(
             cmd,
             cwd=cd.absolute().as_posix(),
             timeout_seconds=effective_timeout_seconds,
+            env=gemini_env,
         ):
             try:
                 line_dict = json.loads(line.strip())
@@ -321,11 +326,6 @@ def _execute_gemini_session(
                 item_type = line_dict.get("type", "")
                 item_role = line_dict.get("role", "")
                 if item_type == "message" and item_role == "assistant":
-                    if (
-                        "The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n"
-                        in line_dict.get("content", "")
-                    ):
-                        continue
                     agent_messages = agent_messages + line_dict.get("content", "")
                 if line_dict.get("session_id") is not None:
                     thread_id = line_dict.get("session_id")
