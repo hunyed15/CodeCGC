@@ -106,10 +106,9 @@ def extract_text_content(value: Any) -> str:
 
 
 def normalize_mcp_result(raw: dict[str, Any]) -> dict[str, Any]:
-    structured_content = raw.get("structuredContent")
-    if isinstance(structured_content, dict):
-        return structured_content
-
+    # Prefer text content over structuredContent — the tool's actual JSON
+    # response is in content[0].text, while structuredContent is an MCP SDK
+    # convenience wrapper that may omit top-level fields like "success".
     content = raw.get("content")
     if isinstance(content, list):
         for item in content:
@@ -126,6 +125,10 @@ def normalize_mcp_result(raw: dict[str, Any]) -> dict[str, Any]:
                 continue
             if isinstance(parsed, dict):
                 return parsed
+
+    structured_content = raw.get("structuredContent")
+    if isinstance(structured_content, dict):
+        return structured_content
 
     return {
         "success": False,
@@ -280,15 +283,23 @@ def write_audit_file(audit_root: Path, audit_record: dict[str, Any]) -> Path:
 
 async def execute_payload(payload: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
     params = build_server_params(payload["target"])
+    raw_result = None
 
-    async with stdio_client(params) as (read_stream, write_stream):
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            raw_result = await session.call_tool(
-                payload["tool_name"],
-                payload["tool_args"],
-                read_timeout_seconds=datetime.timedelta(seconds=timeout_seconds),
-            )
+    try:
+        async with stdio_client(params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                raw_result = await session.call_tool(
+                    payload["tool_name"],
+                    payload["tool_args"],
+                    read_timeout_seconds=datetime.timedelta(seconds=timeout_seconds),
+                )
+    except* ExceptionGroup:
+        # MCP SDK 清理阶段的 TaskGroup 异常不影响已获得的结果
+        pass
+
+    if raw_result is None:
+        raise RuntimeError("MCP call failed before producing a result.")
 
     dumped = raw_result.model_dump(mode="json")
     normalized = normalize_mcp_result(dumped)
