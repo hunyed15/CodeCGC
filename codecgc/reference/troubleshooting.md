@@ -7,19 +7,11 @@
 It does not install CodeCGC into every project. Run this per project:
 
 ```bash
-cgc-install
+cgc-init
 cgc-start
 cgc-status
 cgc-doctor
 ```
-
-Use `--mode user-dry-run` only to preview user-level Claude integration:
-
-```bash
-cgc-install --mode user-dry-run
-```
-
-Do not use `--mode user` unless you intentionally want to write user-level Claude files.
 
 ## MCP JSON Parse Errors
 
@@ -37,7 +29,7 @@ The MCP tool surface should request JSON internally, even when the user asked fo
 If `cgc-start`, `cgc-status`, or `cgc-doctor` reports `onboarding_file` or `onboarding_file_ready`, rerun project-local install:
 
 ```bash
-cgc-install
+cgc-init
 cgc-start
 ```
 

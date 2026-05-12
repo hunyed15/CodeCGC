@@ -29,6 +29,6 @@ __pycache__/
 **/__pycache__/
 *.egg-info/
 node_modules/
-codexmcp/.venv/
-geminimcp/.venv/
-codecgcmcp/.venv/
+mcp/codexmcp/.venv/
+mcp/geminimcp/.venv/
+mcp/codecgcmcp/.venv/

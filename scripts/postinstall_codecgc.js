@@ -18,7 +18,7 @@ function main() {
 
   console.warn("[codecgc] Global CLI installed.");
   console.warn("[codecgc] CodeCGC no longer writes Claude user-level files during npm install.");
-  console.warn("[codecgc] Run `cgc-install` from each target project to create project-local .mcp.json, .claude/, and model-routing.yaml.");
+  console.warn("[codecgc] Run `cgc-init` from each target project to create project-local .mcp.json, .claude/, and model-routing.yaml.");
   return 0;
 }
 

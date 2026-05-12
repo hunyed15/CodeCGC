@@ -10,7 +10,7 @@ CodeCGC 的推荐用户入口是 Claude 内的 `/cgc`，背后优先调用 CodeC
 
 - `/cgc`
 - `/cgc-start`
-- `/cgc-install`
+- `/cgc-init`
 - `/cgc-status`
 - `/cgc-doctor`
 - `/cgc-review`
@@ -30,7 +30,7 @@ CLI 命令继续保留，但主要用于本地调试、CI、维护和 MCP 不可
 
 如果你是第一次把 CodeCGC 接入某个项目，建议顺序是：
 
-1. 在目标项目根目录运行 `cgc-install`
+1. 在目标项目根目录运行 `cgc-init`
 2. 运行 `cgc-start` 查看项目本地首次使用入口
 3. 运行 `cgc-status`，必要时再运行 `cgc-doctor`
 4. 在 Claude 中用 `/cgc <自然语言需求>` 开始
@@ -39,7 +39,7 @@ CLI 命令继续保留，但主要用于本地调试、CI、维护和 MCP 不可
 最小示例：
 
 ```bash
-cgc-install
+cgc-init
 cgc-start
 cgc-status
 cgc "新增一个登录页面，放在 src/components/LoginForm.tsx"
@@ -48,7 +48,7 @@ cgc "新增一个登录页面，放在 src/components/LoginForm.tsx"
 如果当前 shell 目录不是目标项目根目录：
 
 ```bash
-cgc-install --workspace D:\Projects\MyApp
+cgc-init --workspace D:\Projects\MyApp
 cgc-status --workspace D:\Projects\MyApp
 ```
 

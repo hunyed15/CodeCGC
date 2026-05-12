@@ -1,4 +1,4 @@
-![这是图片](./images/title.png)
+# GeminiMCP
 
 <div align="center">
 
@@ -112,8 +112,6 @@ claude mcp list
 **1.3** 可选：配置自动允许
 
 在 `~/.claude/settings.json` 的 allow 项中添加 `mcp__gemini__gemini`
-
-![](./images/image.png)
 
 ### 2. 配置claude code提示词（可选）
 

@@ -35,7 +35,7 @@ The current baseline is:
 
 ## Success Criteria
 
-- A new user can install and start from `/cgc-install` and `/cgc`.
+- A new user can install and start from `/cgc-init` and `/cgc`.
 - A maintainer can verify release readiness with one documented command chain.
 - Published docs explain install modes, path rules, troubleshooting, and maintainer checks.
 - Package audits catch missing runtime and reference files before publication.

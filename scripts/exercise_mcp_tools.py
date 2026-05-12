@@ -38,7 +38,7 @@ def build_tool_call(target: str) -> tuple[str, dict]:
                     "Return a structured summary payload.",
                     "Do not touch frontend paths.",
                 ],
-                "cd": str(WORKSPACE / "codexmcp"),
+                "cd": str(WORKSPACE / "mcp" / "codexmcp"),
                 "sandbox": "read-only",
             },
         )
@@ -58,7 +58,7 @@ def build_tool_call(target: str) -> tuple[str, dict]:
                     "Return a structured summary payload.",
                     "Do not touch backend paths.",
                 ],
-                "cd": str(WORKSPACE / "geminimcp"),
+                "cd": str(WORKSPACE / "mcp" / "geminimcp"),
                 "sandbox": False,
             },
         )

@@ -45,16 +45,23 @@
 当前对外公开命令面是：
 
 - `cgc`
-- `cgc-install`
+- `cgc-init`
+- `cgc-start`
 - `cgc-entry`
 - `cgc-plan`
 - `cgc-build`
 - `cgc-fix`
+- `cgc-test`
 - `cgc-review`
 - `cgc-route`
 - `cgc-status`
 - `cgc-doctor`
 - `cgc-package-audit`
+- `cgc-external-audit`
+- `cgc-external-status`
+- `cgc-release-readiness`
+- `cgc-lifecycle`
+- `cgc-history`
 
 其中：
 

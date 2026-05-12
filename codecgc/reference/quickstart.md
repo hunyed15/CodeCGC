@@ -18,13 +18,13 @@ Run project-local install from the target project root:
 
 ```bash
 cd your-project
-cgc-install
+cgc-init
 cgc-start
 cgc-status
 cgc-doctor
 ```
 
-Inside Claude, use `/cgc-install` and then `/cgc-start` for the same project-local path.
+Inside Claude, use `/cgc-init` and then `/cgc-start` for the same project-local path.
 
 The project install syncs:
 
@@ -48,7 +48,7 @@ Run:
 cgc-start
 ```
 
-This is a read-only first-run guide for the current project. If it reports missing onboarding, run `cgc-install` again from the target project root.
+This is a read-only first-run guide for the current project. If it reports missing onboarding, run `cgc-init` again from the target project root.
 
 ## 4. Start Work From The Single Entry
 

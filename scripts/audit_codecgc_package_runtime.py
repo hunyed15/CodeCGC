@@ -2,6 +2,7 @@ import argparse
 import ast
 import json
 import subprocess
+import sys
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
@@ -10,11 +11,12 @@ from codecgc_console_io import render_summary_block
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 PACKAGE_JSON_PATH = WORKSPACE / "package.json"
+_PYTHON_CMD = sys.executable
 
 RUNTIME_ENTRYPOINTS = [
     "bin/codecgc.js",
     "bin/cgc-start.js",
-    "codecgcmcp/src/codecgcmcp/cli.py",
+    "mcp/codecgcmcp/src/codecgcmcp/cli.py",
     "scripts/install_codecgc.py",
     "scripts/codecgc_cli.py",
     "scripts/codecgc_policy.py",
@@ -22,22 +24,22 @@ RUNTIME_ENTRYPOINTS = [
 
 RUNTIME_STATIC_REQUIREMENTS = [
     ".claude/hooks/route-edit.ps1",
-    "codecgc/templates/claude/settings.local.json",
-    "codecgc/templates/codex/codecgcrc.json",
-    "codecgc/templates/gemini/codecgc-policy.toml",
+    "codecgc/templates/project/claude/settings.local.json",
+    "codecgc/templates/project/codex/codecgcrc.json",
+    "codecgc/templates/project/gemini/policies/codecgc-policy.toml",
     "model-routing.yaml",
     "requirements.txt",
     "scripts/codecgc_runtime/__init__.py",
     "scripts/audit_codecgc_external_capabilities.py",
     "scripts/audit_codecgc_lifecycle.py",
-    "codexmcp/pyproject.toml",
-    "codexmcp/src/codexmcp/__init__.py",
-    "codexmcp/src/codexmcp/cli.py",
-    "codexmcp/src/codexmcp/server.py",
-    "geminimcp/pyproject.toml",
-    "geminimcp/src/geminimcp/__init__.py",
-    "geminimcp/src/geminimcp/cli.py",
-    "geminimcp/src/geminimcp/server.py",
+    "mcp/codexmcp/pyproject.toml",
+    "mcp/codexmcp/src/codexmcp/__init__.py",
+    "mcp/codexmcp/src/codexmcp/cli.py",
+    "mcp/codexmcp/src/codexmcp/server.py",
+    "mcp/geminimcp/pyproject.toml",
+    "mcp/geminimcp/src/geminimcp/__init__.py",
+    "mcp/geminimcp/src/geminimcp/cli.py",
+    "mcp/geminimcp/src/geminimcp/server.py",
     "scripts/audit_codecgc_release_readiness.py",
     "scripts/write_codecgc_guide.py",
     "scripts/write_codecgc_libdoc.py",
@@ -178,7 +180,7 @@ def path_matches_package_files(path_text: str, file_rules: list[str]) -> bool:
 def resolve_local_python_module(module_name: str) -> str:
     relative = normalize_path_text(module_name.replace(".", "/") + ".py")
     package_candidates = [
-        f"{package}/src/{relative}"
+        f"mcp/{package}/src/{relative}"
         for package in ("codecgcmcp", "codexmcp", "geminimcp")
         if module_name == package or module_name.startswith(f"{package}.")
     ]
@@ -196,7 +198,7 @@ def resolve_local_python_module(module_name: str) -> str:
         return package_init
     for package in ("codecgcmcp", "codexmcp", "geminimcp"):
         if module_name == package or module_name.startswith(f"{package}."):
-            package_init = f"{package}/src/{normalize_path_text(module_name.replace('.', '/'))}/__init__.py"
+            package_init = f"mcp/{package}/src/{normalize_path_text(module_name.replace('.', '/'))}/__init__.py"
             if (WORKSPACE / package_init).exists():
                 return package_init
     root_package_init = f"{normalize_path_text(module_name.replace('.', '/'))}/__init__.py"
@@ -394,7 +396,7 @@ def audit_package_runtime() -> dict[str, Any]:
 
 def run_review_policy_refresh_audit() -> dict[str, Any]:
     command = [
-        "python",
+        _PYTHON_CMD,
         str(WORKSPACE / "scripts" / "audit_codecgc_review_policy.py"),
         "--artifact-class",
         "all",
@@ -426,7 +428,7 @@ def run_review_policy_refresh_audit() -> dict[str, Any]:
 
 def run_historical_audit() -> dict[str, Any]:
     command = [
-        "python",
+        _PYTHON_CMD,
         str(WORKSPACE / "scripts" / "audit_codecgc_historical_audits.py"),
         "--format",
         "json",

@@ -1,10 +1,10 @@
 # CodeCGC Onboarding
 
-This document defines the real-project entry experience after `cgc-install`.
+This document defines the real-project entry experience after `cgc-init`.
 
 ## Contract
 
-`cgc-install` is project-local by default. After a successful install, a target project should contain:
+`cgc-init` is project-local by default. After a successful install, a target project should contain:
 
 ```text
 codecgc/START_HERE.md
@@ -18,7 +18,7 @@ codecgc/START_HERE.md
 Inside Claude:
 
 ```text
-/cgc-install
+/cgc-init
 /cgc-start
 /cgc-status
 /cgc-doctor
@@ -28,7 +28,7 @@ Inside Claude:
 Outside Claude:
 
 ```bash
-cgc-install
+cgc-init
 cgc-start
 cgc-status
 cgc-doctor
@@ -42,13 +42,13 @@ cgc "新增一个登录页面，放在 src/components/LoginForm.tsx"
 - whether `codecgc/START_HERE.md` exists and matches the current onboarding contract
 - the project-local onboarding file path
 - the shortest next actions for Claude and CLI users
-- the fallback action when onboarding is missing, normally `/cgc-install` or `cgc-install`
+- the fallback action when onboarding is missing, normally `/cgc-init` or `cgc-init`
 
 The CLI equivalent is `cgc-start`.
 
 ## Why This Exists
 
-Without an explicit first-run entry, new users can install successfully but still be unsure whether to use `/cgc`, `/cgc-install`, `cgc-plan`, `cgc-build`, or another lower-level command. The onboarding surface keeps ordinary users on the product path:
+Without an explicit first-run entry, new users can install successfully but still be unsure whether to use `/cgc`, `/cgc-init`, `cgc-plan`, `cgc-build`, or another lower-level command. The onboarding surface keeps ordinary users on the product path:
 
 ```text
 install -> start -> status/doctor -> /cgc natural-language request
@@ -61,7 +61,7 @@ Maintainer commands remain available, but they should not be required for the fi
 If `cgc-start` reports missing onboarding, run:
 
 ```bash
-cgc-install
+cgc-init
 ```
 
 If `cgc-status` reports `onboarding_file` as missing or outdated, the same repair action applies.

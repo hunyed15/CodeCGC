@@ -1,4 +1,4 @@
-![这是图片](./images/title.png)
+# CodexMCP
 
 <div align="center">
 
@@ -94,7 +94,6 @@ claude mcp list
 >  `codex: uvx --from git+https://github.com/GuDaStudio/codexmcp.git codexmcp - ✓ Connected` 
 
 **1.4** 可选择默认允许claude code自动与codex交互，在`~/.claude/settings.json`添加 `mcp__codex__codex` allow项
-![](images/image.png)
 
 ### 2. 配置claude code提示词（可选）
 

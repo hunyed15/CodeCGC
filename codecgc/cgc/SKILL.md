@@ -20,7 +20,7 @@ Before answering:
 
 ## Route Table
 
-- installing or repairing CodeCGC in a repo: `cgc-install` and `cgc-onboard`
+- installing or repairing CodeCGC in a repo: `cgc-init` and `cgc-onboard`
 - shaping or clarifying a request: `cgc-plan`
 - starting or continuing feature delivery: `cgc-build`
 - starting or continuing issue fixing: `cgc-fix`

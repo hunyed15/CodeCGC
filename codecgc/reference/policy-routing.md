@@ -34,10 +34,10 @@ Project install is the default integration path:
 
 ```bash
 cd your-project
-cgc-install
+cgc-init
 ```
 
-This creates project-local `.mcp.json`, `.claude/`, `model-routing.yaml`, and the `codecgc/` workflow directories. User-level install modes are explicit escape hatches only.
+This creates project-local `.mcp.json`, `.claude/`, `model-routing.yaml`, and the `codecgc/` workflow directories.
 
 ## Policy Checker
 

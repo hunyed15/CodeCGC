@@ -91,6 +91,7 @@ Runtime payloads may provide a more specific `error_category` or `failure_catego
 - `codecgc.test`
 - `codecgc.package_audit`
 - `codecgc.external_audit`
+- `codecgc.external_status`
 - `codecgc.release_readiness`
 - `codecgc.lifecycle`
 

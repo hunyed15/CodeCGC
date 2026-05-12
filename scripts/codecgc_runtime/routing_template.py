@@ -43,7 +43,6 @@ DEFAULT_ORCHESTRATION_PATHS = [
 
 DEFAULT_DOCS_PATHS = [
     "README.md",
-    "INSTALLATION.md",
     "docs/**",
     "CHANGELOG.md",
 ]

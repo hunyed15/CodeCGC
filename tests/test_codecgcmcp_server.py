@@ -133,10 +133,9 @@ def test_install_maps_to_json_runtime_args(monkeypatch):
     captured, payload = _run(_capture_tool_call(
         monkeypatch,
         server.codecgc_install,
-        mode="user-dry-run",
+        mode="local",
         format="summary",
         workspace=workspace,
-        user_root="C:\\Users\\Example\\.claude",
     ))
 
     assert captured["tool_name"] == "codecgc.install"
@@ -144,13 +143,11 @@ def test_install_maps_to_json_runtime_args(monkeypatch):
     assert captured["requested_format"] == "summary"
     assert captured["args"] == [
         "--mode",
-        "user-dry-run",
+        "local",
         "--format",
         "json",
         "--workspace",
         str(Path(workspace).resolve()),
-        "--user-root",
-        "C:\\Users\\Example\\.claude",
     ]
     assert payload["success"] is True
 

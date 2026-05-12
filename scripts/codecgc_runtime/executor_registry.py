@@ -26,7 +26,7 @@ def build_executor_registry() -> dict[str, dict[str, Any]]:
             "routing_executor": "codexmcp",
             "tool_name": "implement_backend_task",
             "python_module": "codexmcp.cli",
-            "pythonpath": str(WORKSPACE / "codexmcp" / "src"),
+            "pythonpath": str(WORKSPACE / "mcp" / "codexmcp" / "src"),
             "python_command": python_command,
         },
         "frontend": {
@@ -35,7 +35,7 @@ def build_executor_registry() -> dict[str, dict[str, Any]]:
             "routing_executor": "geminimcp",
             "tool_name": "implement_frontend_task",
             "python_module": "geminimcp.cli",
-            "pythonpath": str(WORKSPACE / "geminimcp" / "src"),
+            "pythonpath": str(WORKSPACE / "mcp" / "geminimcp" / "src"),
             "python_command": python_command,
         },
     }

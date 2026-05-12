@@ -9,7 +9,7 @@ Objective:
 Deliverables:
 
 - `/cgc` as the primary user entry.
-- `/cgc-install`, `/cgc-status`, and `/cgc-doctor` for setup and health checks.
+- `/cgc-init`, `/cgc-status`, and `/cgc-doctor` for setup and health checks.
 - `/cgc-review` and `/cgc-history` for common control points.
 - Documentation that explains when to use CLI fallback.
 

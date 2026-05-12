@@ -7,15 +7,8 @@
       "Update(**)",
       "Write(**)",
       "mcp__*",
-      "mcp__codecgc__*",
-      "mcp__codex__*",
-      "mcp__gemini__*",
       "Bash(*)",
-      "PowerShell(*)",
-      "Edit *",
-      "Reading *",
-      "Added *",
-      "mcp__memos-mcp__add_message"
+      "PowerShell(*)"
     ]
   },
   "enabledMcpjsonServers": [

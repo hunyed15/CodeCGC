@@ -42,7 +42,7 @@ Also inspect:
 After onboarding, the repo should be ready to use:
 
 - `cgc`
-- `cgc-install`
+- `cgc-init`
 - `cgc-status`
 - `cgc-doctor`
 - `cgc-plan`

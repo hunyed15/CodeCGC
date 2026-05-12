@@ -42,7 +42,7 @@ const helpText = `CodeCGC 命令入口
   cgc --latest
   cgc --slug <workflow-slug>
   cgc-start [--format json|summary] [--workspace <dir>]
-  cgc-install [--mode local|user-dry-run|user|status|doctor|start] [--workspace <dir>] [--user-root <dir>]
+  cgc-init [--mode local|status|doctor|start] [--workspace <dir>]
   cgc-status [--format json|summary]
   cgc-doctor [--format json|summary]
   cgc-package-audit [--format json|summary]
@@ -81,7 +81,7 @@ const helpText = `CodeCGC 命令入口
   我只想让 CodeCGC 告诉我下一步该跑哪个命令
     cgc-route ...
   我想把 CodeCGC 安装或重新同步到当前项目
-    cgc-install
+    cgc-init
   我刚装完，想看当前项目下一步怎么开始
     cgc-start
   我想知道集成面现在是否就绪
@@ -107,7 +107,7 @@ const helpText = `CodeCGC 命令入口
 
 命令职责:
   cgc-start          显示当前项目的首次使用入口和下一步动作
-  cgc-install        同步项目级或用户级集成面
+  cgc-init        同步项目级集成面
   cgc-status         检查集成是否就绪，并给出下一步
   cgc-doctor         检查运行前置、执行器导入与项目集成状态
   cgc-package-audit  检查发布包是否覆盖运行时依赖
@@ -126,7 +126,7 @@ const helpText = `CodeCGC 命令入口
   version            输出当前产品壳版本
 
 首次使用:
-  1. 先在目标项目根目录执行 cgc-install
+  1. 先在目标项目根目录执行 cgc-init
   2. 执行 cgc-start 查看项目本地入口说明
   3. 再执行 cgc-status，必要时补 cgc-doctor
   4. 然后直接使用 cgc "<自然语言需求>" 或 cgc-entry
@@ -147,7 +147,7 @@ const helpText = `CodeCGC 命令入口
   cgc-test --flow feature --slug 2026-05-01-demo-login-ui --step-number 2 --dry-run
   cgc-review --audit-file codecgc/execution/demo-login-ui-step-1.json --decision accepted
   cgc-route --flow feature --slug 2026-05-01-demo-login-ui
-  cgc-install
+  cgc-init
   cgc-status
   cgc-status --format summary
   cgc-doctor --format summary
@@ -157,8 +157,7 @@ const helpText = `CodeCGC 命令入口
   cgc-release-readiness --format summary
   cgc-lifecycle --format summary
   cgc-history --status open --last 10
-  cgc-install --mode user-dry-run --user-root C:\\Users\\Admin\\.claude
-  cgc-install --workspace D:\\Projects\\MyApp
+  cgc-init --workspace D:\\Projects\\MyApp
   cgc-entry --request "新增一个登录页面，放在 src/components/LoginForm.tsx"
 
 环境变量:
@@ -185,7 +184,7 @@ const startHelpText = `CodeCGC Start
     summary 用于新手入口摘要，json 用于调试或自动化消费。
 
 推荐用法:
-  cgc-install
+  cgc-init
   cgc-start
   cgc-status
   cgc-doctor
@@ -195,7 +194,7 @@ const startHelpText = `CodeCGC Start
 const installHelpText = `CodeCGC 安装与自检
 
 用法:
-  cgc-install [--mode <local|user-dry-run|user|status|doctor|start>] [--workspace <dir>] [--user-root <dir>] [--format <json|summary>]
+  cgc-init [--mode <local|status|doctor|start>] [--workspace <dir>] [--format <json|summary>]
 
 用途:
   准备、检查或修复 CodeCGC 在 Claude 与 MCP 启动链路上的集成面。
@@ -203,12 +202,8 @@ const installHelpText = `CodeCGC 安装与自检
 模式:
   local
     把项目级 .mcp.json、.claude/settings.json 与 route-edit.ps1 hook 同步到目标工作区。
-  user-dry-run
-    只预演用户级 Claude 集成，不写入文件。
-  user
-    把用户级 Claude 集成写入指定的 Claude 根目录。
   status
-    检查项目级集成是否就绪，并附带用户级集成预览状态。
+    检查项目级集成是否就绪。
   doctor
     检查运行前置、执行器可导入性，以及项目级集成是否就绪。
   start
@@ -217,19 +212,16 @@ const installHelpText = `CodeCGC 安装与自检
 主要参数:
   --workspace <dir>
     local/status/doctor 模式下的目标项目根目录。默认使用当前 shell 所在目录。
-  --user-root <dir>
-    user 与 user-dry-run 模式下显式指定 Claude 用户目录。
   --format <json|summary>
     面向 Claude 或人工阅读时建议使用 summary；排查底层细节时用 json。
 
 推荐用法:
-  cgc-install
+  cgc-init
   cgc-start
-  cgc-install --workspace D:\\Projects\\MyApp
-  cgc-install --mode start --format summary
-  cgc-install --mode status --format summary
-  cgc-install --mode doctor --format summary
-  cgc-install --mode user-dry-run --user-root C:\\Users\\Admin\\.claude
+  cgc-init --workspace D:\\Projects\\MyApp
+  cgc-init --mode start --format summary
+  cgc-init --mode status --format summary
+  cgc-init --mode doctor --format summary
 
 相关命令:
   cgc-start
@@ -274,7 +266,7 @@ const statusHelpText = `CodeCGC 安装状态
 相关命令:
   cgc-start
     查看当前项目首次使用入口。
-  cgc-install
+  cgc-init
     同步或修复当前项目集成面。
   cgc-doctor
     检查运行前置、执行器导入和项目集成状态。
@@ -306,7 +298,7 @@ const doctorHelpText = `CodeCGC Doctor
 相关命令:
   cgc-status
     快速查看项目集成是否就绪。
-  cgc-install
+  cgc-init
     同步或修复集成文件。
   cgc-package-audit
     检查发布包运行面与发布就绪状态。
@@ -333,7 +325,7 @@ const packageAuditHelpText = `CodeCGC 发布包审计
   cgc-package-audit --format json
 
 相关命令:
-  cgc-install
+  cgc-init
     检查并同步当前项目的 Claude/MCP 集成面。
   cgc-status
     查看当前项目集成状态。
@@ -1109,10 +1101,13 @@ function normalizeWorkflowHelpText(rawText, subcommand) {
     .replaceAll("python  scripts/codecgc_cli.py", "cgc");
 }
 
+const BINARY_ALIASES = { "cgc-init": "cgc-install" };
+
 function resolveCommandInvocation(invokedName, rawArgs) {
-    if (DASH_COMMANDS.has(invokedName)) {
+  const resolvedName = BINARY_ALIASES[invokedName] || invokedName;
+    if (DASH_COMMANDS.has(resolvedName)) {
       return {
-        subcommand: invokedName.slice(4),
+        subcommand: resolvedName.slice(4),
         rest: rawArgs,
         invokedAsRoot: false,
       };

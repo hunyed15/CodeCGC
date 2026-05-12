@@ -37,7 +37,7 @@ Use project-relative paths for persisted product state, audits, fixtures, review
 
 ## Installer Responsibility
 
-`cgc-install` is responsible for writing machine-specific runtime paths into the target project integration files.
+`cgc-init` is responsible for writing machine-specific runtime paths into the target project integration files.
 
 It should not hard-code paths from the development machine into reusable templates or persisted workflow artifacts.
 

@@ -33,7 +33,7 @@ Claude /cgc -> CodeCGC MCP tool -> CodeCGC runtime -> Codex or Gemini executor
 The normal install path is:
 
 ```text
-npm global install -> project-local cgc-install -> cgc-start -> project .mcp.json / .claude / model-routing.yaml
+npm global install -> project-local cgc-init -> cgc-start -> project .mcp.json / .claude / model-routing.yaml
 ```
 
 User-level Claude installation is optional and must be explicit.
@@ -43,7 +43,7 @@ User-level Claude installation is optional and must be explicit.
 The preferred Claude-facing commands are intentionally small:
 
 - `/cgc`
-- `/cgc-install`
+- `/cgc-init`
 - `/cgc-status`
 - `/cgc-doctor`
 - `/cgc-review`

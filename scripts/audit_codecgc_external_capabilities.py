@@ -159,7 +159,7 @@ def audit_external_capabilities(workspace_override: str = "", view: str = "audit
     if blocking_items:
         blocking_ids = {str(item["id"]) for item in blocking_items}
         if "codexmcp" in blocking_ids or "geminimcp" in blocking_ids:
-            recommended_next_action = "先运行 cgc-install 或 cgc-doctor，修复必需执行器的项目级集成与运行前置。"
+            recommended_next_action = "先运行 cgc-init 或 cgc-doctor，修复必需执行器的项目级集成与运行前置。"
         else:
             recommended_next_action = "先补齐缺失的必需外部能力注册，再继续后续流程。"
     elif malformed_count > 0:

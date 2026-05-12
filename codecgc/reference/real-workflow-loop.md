@@ -1,6 +1,6 @@
 # CodeCGC Real Workflow Loop
 
-This page describes the repeatable CodeCGC loop after a project has already run `cgc-install`.
+This page describes the repeatable CodeCGC loop after a project has already run `cgc-init`.
 
 The goal is not to make users memorize every command. The goal is to keep one stable control loop where Claude orchestrates state, Codex or Gemini executes scoped code work, and review closes the loop only when there is enough evidence.
 

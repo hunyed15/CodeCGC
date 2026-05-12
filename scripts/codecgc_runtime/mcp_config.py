@@ -35,7 +35,7 @@ def build_mcp_config(workspace_root: Path | None = None) -> dict[str, Any]:
         "args": ["-m", "codecgcmcp.cli"],
         "env": _with_workspace_env(
             {
-                "PYTHONPATH": build_runtime_pythonpath(WORKSPACE / "codecgcmcp" / "src"),
+                "PYTHONPATH": build_runtime_pythonpath(WORKSPACE / "mcp" / "codecgcmcp" / "src"),
             },
             workspace_root,
         ),
@@ -48,7 +48,7 @@ def build_mcp_config(workspace_root: Path | None = None) -> dict[str, Any]:
             "env": _with_workspace_env(
                 {
                     "PYTHONPATH": build_runtime_pythonpath(
-                        WORKSPACE / "codecgcmcp" / "src",
+                        WORKSPACE / "mcp" / "codecgcmcp" / "src",
                         Path(str(config["pythonpath"])),
                     ),
                 },

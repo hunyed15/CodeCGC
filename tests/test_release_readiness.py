@@ -17,6 +17,6 @@ def test_release_readiness_probe_installs_into_configured_temp_root(monkeypatch,
 def test_package_runtime_audit_requires_project_policy_templates():
     required_paths = build_runtime_requirement_set()["required_paths"]
 
-    assert "codecgc/templates/claude/settings.local.json" in required_paths
-    assert "codecgc/templates/codex/codecgcrc.json" in required_paths
-    assert "codecgc/templates/gemini/codecgc-policy.toml" in required_paths
+    assert "codecgc/templates/project/claude/settings.local.json" in required_paths
+    assert "codecgc/templates/project/codex/codecgcrc.json" in required_paths
+    assert "codecgc/templates/project/gemini/policies/codecgc-policy.toml" in required_paths

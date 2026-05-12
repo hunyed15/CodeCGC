@@ -26,7 +26,7 @@ Read:
 Then inspect:
 
 - accepted feature or issue artifacts related to the change
-- relevant files under `scripts/`, `bin/`, `.claude/`, `codexmcp/`, `geminimcp/`
+- relevant files under `scripts/`, `bin/`, `.claude/`, `mcp/codexmcp/`, `mcp/geminimcp/`
 - existing docs under `codecgc/architecture/`
 
 ## What Belongs Here

@@ -1,5 +1,4 @@
 import json
-import os
 
 import pytest
 
@@ -11,136 +10,14 @@ from install_codecgc import PROJECT_HOOK_PATH
 from install_codecgc import PROJECT_ONBOARDING_MARKER
 from install_codecgc import PROJECT_WORKFLOW_DIRS
 from install_codecgc import build_workspace_hook_command
-from install_codecgc import build_user_hook_command
 from install_codecgc import collect_project_status
 from install_codecgc import collect_start_status
-from install_codecgc import collect_user_status
 from install_codecgc import ensure_workspace_workflow_dirs
-from install_codecgc import get_user_claude_paths
 from install_codecgc import get_workspace_paths
 from install_codecgc import install_local_runtime
 from install_codecgc import merge_hook_settings
 from install_codecgc import onboarding_file_is_valid
 from install_codecgc import workspace_workflow_dirs_ready
-
-
-def _write_user_surface(root, mcp_payload):
-    paths = get_user_claude_paths(str(root))
-    paths["root"].mkdir(parents=True, exist_ok=True)
-    paths["hooks_dir"].mkdir(parents=True, exist_ok=True)
-
-    settings_payload = {
-        "hooks": {
-            "PreToolUse": [
-                {
-                    "matcher": EDIT_GUARDRAIL_MATCHER,
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": build_user_hook_command(paths),
-                        }
-                    ],
-                }
-            ]
-        },
-        "permissions": {
-            "allow": list(DEFAULT_ALLOWED_TOOLS),
-        },
-    }
-    paths["settings"].write_text(json.dumps(settings_payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    paths["mcp"].write_text(json.dumps(mcp_payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    paths["hook_script"].write_text(PROJECT_HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-    return paths
-
-
-def _server_env(pythonpath, workspace_root):
-    return {
-        "PYTHONPATH": pythonpath,
-        "CODECGC_WORKSPACE_ROOT": str(workspace_root),
-    }
-
-
-@pytest.mark.unit
-def test_collect_user_status_accepts_runtime_equivalent_mcp(tmp_path):
-    runtime_root = tmp_path / "external-codecgc"
-    pythonpath = os.pathsep.join(
-        [
-            str(runtime_root / "scripts"),
-            str(runtime_root / "codecgcmcp" / "src"),
-        ]
-    )
-    codex_pythonpath = os.pathsep.join(
-        [
-            str(runtime_root / "scripts"),
-            str(runtime_root / "codecgcmcp" / "src"),
-            str(runtime_root / "codexmcp" / "src"),
-        ]
-    )
-    gemini_pythonpath = os.pathsep.join(
-        [
-            str(runtime_root / "scripts"),
-            str(runtime_root / "codecgcmcp" / "src"),
-            str(runtime_root / "geminimcp" / "src"),
-        ]
-    )
-    payload = {
-        "mcpServers": {
-            "codecgc": {
-                "command": "C:\\Python314\\python.exe",
-                "args": ["-m", "codecgcmcp.cli"],
-                "env": _server_env(pythonpath, runtime_root),
-            },
-            "codex": {
-                "command": "C:\\Python314\\python.exe",
-                "args": ["-m", "codexmcp.cli"],
-                "env": _server_env(codex_pythonpath, runtime_root),
-            },
-            "gemini": {
-                "command": "C:\\Python314\\python.exe",
-                "args": ["-m", "geminimcp.cli"],
-                "env": _server_env(gemini_pythonpath, runtime_root),
-            },
-        }
-    }
-
-    status = collect_user_status(_write_user_surface(tmp_path / "user-home", payload))
-
-    assert status["ready"] is True
-    assert status["mcp_matches_expected"] is True
-    assert status["mcp_matches_expected_exact"] is False
-    assert status["mcp_matches_runtime_shape"] is True
-    assert status["missing_or_outdated"] == []
-
-
-@pytest.mark.unit
-def test_collect_user_status_rejects_invalid_runtime_shape(tmp_path):
-    runtime_root = tmp_path / "external-codecgc"
-    payload = {
-        "mcpServers": {
-            "codecgc": {
-                "command": "C:\\Python314\\python.exe",
-                "args": ["-m", "codecgcmcp.cli"],
-                "env": _server_env(os.pathsep.join([str(runtime_root / "scripts")]), runtime_root),
-            },
-            "codex": {
-                "command": "C:\\Python314\\python.exe",
-                "args": ["-m", "codexmcp.cli"],
-                "env": _server_env(os.pathsep.join([str(runtime_root / "scripts")]), runtime_root),
-            },
-            "gemini": {
-                "command": "C:\\Python314\\python.exe",
-                "args": ["-m", "geminimcp.cli"],
-                "env": _server_env(os.pathsep.join([str(runtime_root / "scripts")]), runtime_root),
-            },
-        }
-    }
-
-    status = collect_user_status(_write_user_surface(tmp_path / "user-home", payload))
-
-    assert status["ready"] is False
-    assert status["mcp_matches_expected"] is False
-    assert status["mcp_matches_runtime_shape"] is False
-    assert "mcp_json" in status["missing_or_outdated"]
 
 
 @pytest.mark.unit
@@ -238,7 +115,7 @@ def test_project_status_requires_project_policy_templates(tmp_path):
 def test_start_status_reports_first_run_actions(tmp_path):
     missing = collect_start_status(str(tmp_path))
     assert missing["summary"]["ready"] is False
-    assert "cgc-install --mode local" in missing["summary"]["recommended_next_action"]
+    assert "cgc-init --mode local" in missing["summary"]["recommended_next_action"]
 
     install_local_runtime(str(tmp_path))
     ready = collect_start_status(str(tmp_path))

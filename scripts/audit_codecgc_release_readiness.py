@@ -154,7 +154,7 @@ def audit_release_readiness(workspace_override: str = "") -> dict[str, Any]:
 
     recommended_next_action = ""
     if not install_ready:
-        recommended_next_action = str(install_status.get("summary", {}).get("recommended_project_command", "")).strip() or "cgc-install"
+        recommended_next_action = str(install_status.get("summary", {}).get("recommended_project_command", "")).strip() or "cgc-init"
     elif not doctor_ready:
         recommended_next_action = "cgc-doctor"
     elif not external_ready:

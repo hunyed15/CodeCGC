@@ -139,12 +139,12 @@ def _call_runtime_tool(tool_name: str, script_name: str, *args: str, requested_f
 
 @mcp.tool(
     name="codecgc.install",
-    description="Install or sync CodeCGC integration for the current project or Claude user profile.",
+    description="Install or sync CodeCGC integration for the current project.",
     meta={"version": "0.1.0", "author": "CodeCGC"},
 )
 async def codecgc_install(
     mode: Annotated[
-        Literal["local", "user-dry-run", "user", "status", "doctor"],
+        Literal["local", "status", "doctor"],
         Field(description="Install mode for CodeCGC integration."),
     ] = "local",
     format: Annotated[
@@ -155,18 +155,11 @@ async def codecgc_install(
         str,
         Field(description="Optional target workspace root for local/status/doctor modes."),
     ] = "",
-    user_root: Annotated[
-        str,
-        Field(description="Optional explicit Claude user root for user/user-dry-run modes."),
-    ] = "",
 ) -> CallToolResult:
-    # The MCP surface must always receive machine-readable JSON from the script.
     args = ["--mode", mode, "--format", "json"]
     normalized_workspace = _normalize_workspace(workspace)
     if normalized_workspace:
         args.extend(["--workspace", normalized_workspace])
-    if str(user_root).strip():
-        args.extend(["--user-root", str(user_root).strip()])
     return _call_runtime_tool("codecgc.install", "install_codecgc.py", *args, requested_format=format)
 
 

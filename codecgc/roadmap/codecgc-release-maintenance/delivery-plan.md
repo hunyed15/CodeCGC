@@ -4,9 +4,8 @@ This delivery plan turns the release maintenance roadmap into concrete work item
 
 ## Immediate Work
 
-1. Keep project-local install as the default product path.
-2. Keep user-level install behind explicit `--mode user` or `--mode user-dry-run`.
-3. Keep `/cgc` and `codecgc.entry` as the primary user path.
+1. Keep project-local install as the only install path (no user-level global writes).
+2. Keep `/cgc` and `codecgc.entry` as the primary user path.
 4. Keep the hook as a write guardrail, not as the orchestration engine.
 5. Keep release docs stable and user-facing.
 
