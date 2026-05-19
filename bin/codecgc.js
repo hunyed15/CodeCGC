@@ -201,7 +201,7 @@ const installHelpText = `CodeCGC 安装与自检
 
 模式:
   local
-    把项目级 .mcp.json、.claude/settings.json 与 route-edit.ps1 hook 同步到目标工作区。
+    把项目级 .mcp.json、.claude/settings.json 与 edit-guard.js hook 同步到目标工作区。
   status
     检查项目级集成是否就绪。
   doctor

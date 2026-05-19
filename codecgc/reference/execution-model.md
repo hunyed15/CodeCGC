@@ -47,7 +47,7 @@ CodeCGC 把“工作流控制”和“代码执行”明确分层。
 - `.claude/settings.local.json`
 - `.codex/codecgcrc.json`
 - `.gemini/policies/codecgc-policy.toml`
-- `.claude/hooks/route-edit.ps1`
+- `.claude/hooks/edit-guard.js`
 
 这些文件一起负责“不能越界”。
 

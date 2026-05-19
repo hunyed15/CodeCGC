@@ -16,7 +16,7 @@ mcp/
   geminimcp/
 codecgc/reference/
 codecgc/cgc*/
-.claude/hooks/route-edit.ps1
+.claude/hooks/edit-guard.js
 model-routing.yaml
 ```
 
@@ -43,7 +43,7 @@ codecgc/architecture/
 codecgc/docs/
 ```
 
-Keep `.claude/hooks/route-edit.ps1` in source control because it is the packaged hook template copied into target projects.
+Keep `.claude/hooks/edit-guard.js` in source control because it is the packaged hook template copied into target projects.
 
 Keep `codecgc/fixtures/`, `codecgc/reference/`, `codecgc/roadmap/`, and `codecgc/compound/` when they are used as packaged examples, release-maintenance assets, or regression fixtures.
 
@@ -57,7 +57,7 @@ model-routing.yaml
 .claude/
   settings.local.json
   hooks/
-    route-edit.ps1
+    edit-guard.js
   commands/
     cgc*.md
 .codex/

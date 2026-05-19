@@ -28,7 +28,7 @@ Also inspect:
 
 - `.mcp.json`
 - `.claude/settings.json`
-- `.claude/hooks/route-edit.ps1`
+- `.claude/hooks/edit-guard.js`
 - `model-routing.yaml`
 
 ## Rules

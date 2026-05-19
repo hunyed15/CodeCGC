@@ -25,7 +25,7 @@ PROJECT_GEMINI_POLICY_RELATIVE_PATH = Path(".gemini") / "policies" / "codecgc-po
 mcp = FastMCP("Gemini MCP Server-from guda.studio")
 
 # Mirror of model-routing.yaml backend_paths — keep these hints in sync with
-# route-edit.ps1 and codexmcp/server.py FRONTEND_PATH_HINTS.
+# edit-guard.js and codexmcp/server.py FRONTEND_PATH_HINTS.
 BACKEND_PATH_HINTS = (
     "apps/api/",
     "server/",

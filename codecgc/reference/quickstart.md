@@ -32,7 +32,7 @@ The project install syncs:
 .mcp.json
 model-routing.yaml
 .claude/settings.local.json
-.claude/hooks/route-edit.ps1
+.claude/hooks/edit-guard.js
 .claude/commands/cgc*.md
 .codex/codecgcrc.json
 .gemini/policies/codecgc-policy.toml

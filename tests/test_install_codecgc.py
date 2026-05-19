@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -127,89 +128,18 @@ def test_start_status_reports_first_run_actions(tmp_path):
 
 
 @pytest.mark.unit
-def test_merge_hook_settings_migrates_legacy_edit_write_matcher():
-    command = (
-        "powershell -ExecutionPolicy Bypass -Command "
-        "\"$env:CODECGC_PACKAGE_ROOT='C:\\CodeCGC'; "
-        "$env:CODECGC_WORKSPACE_ROOT='D:\\App'; "
-        "& .claude/hooks/route-edit.ps1\""
-    )
-    settings = {
-        "hooks": {
-            "PreToolUse": [
-                {
-                    "matcher": "Edit|Write",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/route-edit.ps1",
-                        }
-                    ],
-                }
-            ]
-        }
-    }
-
-    merged, changed = merge_hook_settings(settings, command)
-
-    assert changed is True
-    pre_tool_use = merged["hooks"]["PreToolUse"]
-    assert len(pre_tool_use) == 1
-    assert pre_tool_use[0]["matcher"] == EDIT_GUARDRAIL_MATCHER
-    assert pre_tool_use[0]["hooks"] == [{"type": "command", "command": command}]
-
-
-@pytest.mark.unit
-def test_merge_hook_settings_migrates_multiedit_only_matcher_to_shell_guardrail():
-    command = (
-        "powershell -ExecutionPolicy Bypass -Command "
-        "\"$env:CODECGC_PACKAGE_ROOT='C:\\CodeCGC'; "
-        "$env:CODECGC_WORKSPACE_ROOT='D:\\App'; "
-        "& .claude/hooks/route-edit.ps1\""
-    )
-    settings = {
-        "hooks": {
-            "PreToolUse": [
-                {
-                    "matcher": "Edit|Write|MultiEdit",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/route-edit.ps1",
-                        }
-                    ],
-                }
-            ]
-        }
-    }
-
-    merged, changed = merge_hook_settings(settings, command)
-
-    assert changed is True
-    pre_tool_use = merged["hooks"]["PreToolUse"]
-    assert len(pre_tool_use) == 1
-    assert pre_tool_use[0]["matcher"] == EDIT_GUARDRAIL_MATCHER
-    assert "Bash" in pre_tool_use[0]["matcher"]
-    assert "PowerShell" in pre_tool_use[0]["matcher"]
-    assert pre_tool_use[0]["hooks"] == [{"type": "command", "command": command}]
-
-
-@pytest.mark.unit
-def test_workspace_hook_command_pins_package_and_workspace_roots(tmp_path):
-    workspace_paths = {"root": tmp_path}
+def test_workspace_hook_command_returns_node_command():
+    workspace_paths = {"root": Path("/tmp/test")}
 
     command = build_workspace_hook_command(workspace_paths)
 
-    assert "CODECGC_PACKAGE_ROOT" in command
-    assert "CODECGC_WORKSPACE_ROOT" in command
-    assert str(tmp_path) in command
-    assert ".claude/hooks/route-edit.ps1" in command
+    assert command == "node .claude/hooks/edit-guard.js"
 
 
 @pytest.mark.unit
-def test_hook_script_uses_project_mcp_python_command():
+def test_hook_script_is_valid_node_js():
     hook_text = PROJECT_HOOK_PATH.read_text(encoding="utf-8")
 
-    assert "CODECGC_PYTHON_COMMAND" in hook_text
-    assert ".mcp.json" in hook_text
-    assert "mcpServers.codecgc.command" in hook_text
+    assert "model-routing.yaml" in hook_text
+    assert "decision" in hook_text
+    assert "deny" in hook_text

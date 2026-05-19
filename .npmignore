@@ -4,7 +4,7 @@
 .claude/settings.local.json
 .claude/commands/
 !.claude/hooks/
-!.claude/hooks/route-edit.ps1
+!.claude/hooks/edit-guard.js
 .codex/
 .gemini/
 backend/

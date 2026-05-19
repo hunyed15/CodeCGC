@@ -38,7 +38,7 @@
 这套规则通过两层落地：
 
 1. 工作流层：`cgc-build` 与 `cgc-fix`
-2. guardrail 层：`.claude/hooks/route-edit.ps1`
+2. guardrail 层：`.claude/hooks/edit-guard.js`
 
 ## 4. 当前公开命令面
 

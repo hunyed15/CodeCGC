@@ -23,7 +23,7 @@ RUNTIME_ENTRYPOINTS = [
 ]
 
 RUNTIME_STATIC_REQUIREMENTS = [
-    ".claude/hooks/route-edit.ps1",
+    ".claude/hooks/edit-guard.js",
     "codecgc/templates/project/claude/settings.local.json",
     "codecgc/templates/project/codex/codecgcrc.json",
     "codecgc/templates/project/gemini/policies/codecgc-policy.toml",

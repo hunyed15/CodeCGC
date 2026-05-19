@@ -7,7 +7,7 @@
 .gemini/
 .claude/commands/
 !.claude/hooks/
-!.claude/hooks/route-edit.ps1
+!.claude/hooks/edit-guard.js
 codecgc/START_HERE.md
 codecgc/features/
 codecgc/issues/

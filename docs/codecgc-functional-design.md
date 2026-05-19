@@ -35,7 +35,7 @@ CodeCGC 把参与方固定为四个角色，分工不重叠：
 **硬规则**：Claude 不直接修改受路由保护的业务代码。产品源码的写入权限只属于 Codex（后端）或 Gemini（前端）。这条规则通过两层机制强制落地：
 
 1. **工作流层**：`cgc-build` / `cgc-fix` 打包步骤时强制路由到正确执行器
-2. **Guardrail 层**：`.claude/hooks/route-edit.ps1` 拦截 Claude 的 `Edit`、`Write`、`MultiEdit`、`Bash`、`PowerShell`，阻止直接写入绕过路由
+2. **Guardrail 层**：`.claude/hooks/edit-guard.js`（Node.js）拦截 Claude 的 `Edit`、`Write`、`MultiEdit`，阻止直接写入绕过路由
 
 ---
 
@@ -60,7 +60,7 @@ shared_paths:          # 必须拆分后再执行：packages/shared/**、src/typ
 
 路由策略在三个位置同时生效：
 1. `scripts/codecgc_policy.py`：任务打包时的策略检查
-2. `.claude/hooks/route-edit.ps1`：Claude 写入时的实时拦截
+2. `.claude/hooks/edit-guard.js`：Claude 写入时的实时拦截
 3. 审核阶段：`cgc-review` 验证执行器归属是否符合路由
 
 ---
@@ -423,7 +423,7 @@ session_id 不跨 task_id 或 artifact_class 复用。
 ├── .claude/
 │   ├── settings.local.json         # 权限配置
 │   ├── hooks/
-│   │   └── route-edit.ps1          # Write 拦截 guardrail
+│   │   └── edit-guard.js           # Write 拦截 guardrail
 │   └── commands/
 │       └── cgc*.md                 # slash command 定义
 ├── .codex/

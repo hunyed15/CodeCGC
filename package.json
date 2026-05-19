@@ -47,7 +47,7 @@
     "scripts/codecgc_runtime/*.py",
     "scripts/postinstall_codecgc.js",
     "scripts/README-codecgc-cli.md",
-    ".claude/hooks/route-edit.ps1",
+    ".claude/hooks/edit-guard.js",
     "codecgc/cgc/",
     "codecgc/cgc-arch/",
     "codecgc/cgc-build/",

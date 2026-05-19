@@ -64,7 +64,7 @@ model-routing.yaml
 .claude/
   settings.local.json
   hooks/
-    route-edit.ps1
+    edit-guard.js
   commands/
     cgc*.md
 .codex/
@@ -88,7 +88,7 @@ codecgc/
 
 在 CodeCGC 源码仓库中，`.mcp.json`、`.claude/settings.local.json`、`.claude/commands/`、`.codex/`、`.gemini/`、`codecgc/START_HERE.md` 以及实时 workflow 输出目录会被忽略，因为它们是机器相关或项目安装生成的内容。
 
-源码仓库会保留可发布运行时、参考文档、命令模板、测试 fixtures，以及 `.claude/hooks/route-edit.ps1` 这个 hook 模板。
+源码仓库会保留可发布运行时、参考文档、命令模板、测试 fixtures，以及 `.claude/hooks/edit-guard.js` 这个 hook 模板。
 
 ## 角色与路由策略
 

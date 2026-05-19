@@ -21,7 +21,7 @@ import shutil
 mcp = FastMCP("Codex MCP Server-from guda.studio")
 
 # Mirror of model-routing.yaml frontend_paths — keep these hints in sync with
-# route-edit.ps1 and geminimcp/server.py BACKEND_PATH_HINTS.
+# edit-guard.js and geminimcp/server.py BACKEND_PATH_HINTS.
 FRONTEND_PATH_HINTS = (
     "apps/web/",
     "src/components/",

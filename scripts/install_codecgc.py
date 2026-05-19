@@ -21,9 +21,10 @@ from sync_codecgc_mcp_config import write_mcp_config
 WORKSPACE = PACKAGE_ROOT
 PROJECT_ROUTING_PATH = WORKSPACE / "model-routing.yaml"
 PROJECT_TEMPLATES_DIR = WORKSPACE / "codecgc" / "templates" / "project"
-PROJECT_HOOK_PATH = PROJECT_TEMPLATES_DIR / "claude" / "hooks" / "route-edit.ps1"
-EDIT_GUARDRAIL_MATCHER = "Edit|Write|MultiEdit|Bash|PowerShell"
-LEGACY_EDIT_GUARDRAIL_MATCHERS = {"Edit|Write", "Edit|Write|MultiEdit"}
+PROJECT_HOOK_PATH = PROJECT_TEMPLATES_DIR / "claude" / "hooks" / "edit-guard.js"
+PROJECT_CLAUDE_MD_TEMPLATE = PROJECT_TEMPLATES_DIR / "CLAUDE.md"
+CLAUDE_MD_MARKER = "<!-- codecgc:claude-md:v1 -->"
+EDIT_GUARDRAIL_MATCHER = "Edit|Write|MultiEdit"
 PROJECT_ONBOARDING_RELATIVE_PATH = "codecgc/START_HERE.md"
 PROJECT_ONBOARDING_MARKER = "<!-- codecgc:onboarding:v1 -->"
 CLAUDE_SETTINGS_TEMPLATE = PROJECT_TEMPLATES_DIR / "claude" / "settings.local.json"
@@ -38,7 +39,7 @@ DEFAULT_HOOKS = {
             "hooks": [
                 {
                     "type": "command",
-                    "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/route-edit.ps1",
+                    "command": "node .claude/hooks/edit-guard.js",
                 }
             ],
         }
@@ -83,7 +84,8 @@ def get_workspace_paths(override_workspace: str = "") -> dict[str, Path]:
         "settings": claude_dir / "settings.local.json",
         "legacy_settings": claude_dir / "settings.json",
         "mcp": root / ".mcp.json",
-        "hook_script": hooks_dir / "route-edit.ps1",
+        "hook_script": hooks_dir / "edit-guard.js",
+        "claude_md": claude_dir / "CLAUDE.md",
         "commands_dir": claude_dir / "commands",
         "routing_file": root / "model-routing.yaml",
         "onboarding_file": root / PROJECT_ONBOARDING_RELATIVE_PATH,
@@ -165,7 +167,8 @@ cgc "新增一个登录页面，放在 src/components/LoginForm.tsx"
 .mcp.json
 model-routing.yaml
 .claude/settings.local.json
-.claude/hooks/route-edit.ps1
+.claude/hooks/edit-guard.js
+.claude/CLAUDE.md
 .claude/commands/cgc*.md
 .codex/codecgcrc.json
 .gemini/policies/codecgc-policy.toml
@@ -248,10 +251,6 @@ def policy_file_is_valid(path: Path) -> bool:
     except Exception:
         return False
     return True
-
-
-def _normalize_command_path_for_markdown(path: Path) -> str:
-    return str(path).replace("\\", "\\\\")
 
 
 def build_mcp_first_command_template(
@@ -559,7 +558,7 @@ def is_codecgc_route_edit_hook(hook: Any) -> bool:
     if hook.get("type") != "command":
         return False
     command = str(hook.get("command", "")).replace("\\", "/").lower()
-    return "route-edit.ps1" in command
+    return "edit-guard" in command
 
 
 def merge_hook_settings(current: dict[str, Any], command_text: str) -> tuple[dict[str, Any], bool]:
@@ -578,7 +577,7 @@ def merge_hook_settings(current: dict[str, Any], command_text: str) -> tuple[dic
     for item in list(pre_tool_use):
         if not isinstance(item, dict):
             continue
-        if item.get("matcher") not in LEGACY_EDIT_GUARDRAIL_MATCHERS | {EDIT_GUARDRAIL_MATCHER}:
+        if item.get("matcher") != EDIT_GUARDRAIL_MATCHER:
             continue
         hook_list = item.get("hooks")
         if not isinstance(hook_list, list):
@@ -796,32 +795,8 @@ def mcp_server_matches_runtime_shape(server_payload: dict[str, Any], spec: dict[
     return True
 
 
-def mcp_config_matches_runtime_shape(payload: dict[str, Any]) -> bool:
-    servers = payload.get("mcpServers")
-    if not isinstance(servers, dict):
-        return False
-
-    for server_name, spec in RUNTIME_MCP_SERVER_SPECS.items():
-        server_payload = servers.get(server_name)
-        if not isinstance(server_payload, dict):
-            return False
-        if not mcp_server_matches_runtime_shape(server_payload, spec):
-            return False
-    return True
-
-
 def build_workspace_hook_command(workspace_paths: dict[str, Path]) -> str:
-    package_root = str(WORKSPACE).replace("'", "''")
-    workspace_root_path = Path(workspace_paths["root"])
-    hook_script_path = workspace_paths.get("hook_script", workspace_root_path / ".claude" / "hooks" / "route-edit.ps1")
-    workspace_root = str(workspace_root_path).replace("'", "''")
-    hook_script = str(hook_script_path).replace("\\", "/").replace("'", "''")
-    return (
-        "powershell -ExecutionPolicy Bypass -Command "
-        f"\"$env:CODECGC_PACKAGE_ROOT='{package_root}'; "
-        f"$env:CODECGC_WORKSPACE_ROOT='{workspace_root}'; "
-        f"& '{hook_script}'\""
-    )
+    return "node .claude/hooks/edit-guard.js"
 
 
 def build_mode_summary_payload(
@@ -839,6 +814,32 @@ def build_mode_summary_payload(
     if extra:
         summary.update(extra)
     return summary
+
+
+def install_project_claude_md(target_path: Path) -> str:
+    """Install or append CodeCGC rules to .claude/CLAUDE.md.
+
+    - Does not exist: create with template content.
+    - Exists without marker: append template content.
+    - Exists with marker: skip (don't overwrite user modifications).
+    """
+    if not PROJECT_CLAUDE_MD_TEMPLATE.exists():
+        return str(target_path)
+
+    template_content = PROJECT_CLAUDE_MD_TEMPLATE.read_text(encoding="utf-8")
+
+    if target_path.exists():
+        existing = target_path.read_text(encoding="utf-8")
+        if CLAUDE_MD_MARKER in existing:
+            return str(target_path)
+        # Append with separator
+        separator = "\n\n---\n\n" if not existing.endswith("\n\n") else ""
+        target_path.write_text(existing + separator + template_content, encoding="utf-8")
+    else:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(template_content, encoding="utf-8")
+
+    return str(target_path)
 
 
 def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
@@ -861,6 +862,7 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
         shutil.copyfile(PROJECT_HOOK_PATH, workspace_paths["hook_script"])
     written_commands = write_custom_command_files(workspace_paths["commands_dir"], WORKSPACE / "bin")
     onboarding_file = write_project_onboarding_file(workspace_paths["root"])
+    claude_md_path = install_project_claude_md(workspace_paths["claude_md"])
 
     summary = build_mode_summary_payload(
         scope="项目级 Claude 与 MCP 集成面",
@@ -878,6 +880,7 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
         "codex_policy": str(codex_policy_path),
         "gemini_policy": str(gemini_policy_path),
         "hook_script": str(workspace_paths["hook_script"]),
+        "claude_md": str(claude_md_path),
         "commands_dir": str(workspace_paths["commands_dir"]),
         "onboarding_file": str(onboarding_file),
         "workflow_dirs": workflow_dirs,
@@ -887,7 +890,8 @@ def install_local_runtime(override_workspace: str = "") -> dict[str, Any]:
             "Project-local model-routing.yaml was synchronized as the policy source of truth.",
             "Project-local codecgc workflow directories were initialized.",
             "Claude pre-edit guardrail hook was synchronized into the target workspace.",
-            "Claude project permissions were rendered from codecgc/templates/project/claude/settings.local.json.",
+            "Claude project permissions were rendered with whitelist (Edit/Write restricted to codecgc, .claude, docs, config).",
+            ".claude/CLAUDE.md was installed with CodeCGC workflow rules and three-layer protection guidance.",
             "Project-local Codex policy contract was synchronized into .codex/codecgcrc.json.",
             "Project-local Gemini policy was synchronized into .gemini/policies/codecgc-policy.toml.",
             "Project-local Claude slash commands were synchronized into .claude/commands.",
