@@ -9,6 +9,7 @@ import type { PathOwnership, StepExecutor } from "../../../shared/types.js";
 export interface RouteArgs {
   paths: string[];
   cd?: string;
+  executor_hint?: "frontend" | "backend" | "docs" | "both"; // New: explicit declaration
 }
 
 export interface RouteResult {
@@ -26,16 +27,42 @@ export interface RouteResult {
 }
 
 /**
- * codecgc.route — 根据路径判断归属，推荐 executor
+ * codecgc.route - Determine path ownership and recommend executor
  *
- * 用途：
- * - Claude 在 plan 阶段调用此工具，自动推断每个 step 的 executor
- * - 检测 mixed/shared/unknown 路径，提示拆分
- * - 返回拆分建议，便于自动生成多个 step
+ * Hybrid routing strategy (priority from high to low):
+ * 1. executor_hint (explicit declaration) - Claude judges by semantics
+ * 2. Directory convention (frontend/backend paths) - project structure
+ * 3. routing.yaml rules (extensions + path patterns) - fallback
+ *
+ * Usage:
+ * - Claude calls this tool during plan phase to infer executor for each step
+ * - Detect mixed/shared/unknown paths and suggest splitting
+ * - Return split suggestions for auto-generating multiple steps
  */
 export async function route(args: RouteArgs): Promise<RouteResult> {
   try {
     const projectRoot = resolveProjectRoot(args.cd);
+
+    // Priority 1: Explicit declaration (executor_hint)
+    if (args.executor_hint) {
+      if (args.executor_hint === "both") {
+        // "both" means both frontend and backend need changes, split required
+        return handleBothHint(args.paths, projectRoot);
+      }
+
+      // Single executor hint, return directly
+      const executor = hintToExecutor(args.executor_hint);
+      return {
+        success: true,
+        paths: args.paths,
+        classification: buildClassificationFromHint(args.paths, args.executor_hint),
+        is_mixed: false,
+        recommended_executor: executor,
+        recommendation: `Based on executor_hint="${args.executor_hint}", recommend executor: ${executor}`,
+      };
+    }
+
+    // Priority 2 & 3: Directory convention + routing.yaml
     const routing = await readRouting(projectRoot);
     const classified = classifyPaths(args.paths, routing);
 
@@ -58,16 +85,16 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
         classification,
         is_mixed: false,
         recommended_executor: executor,
-        recommendation: `所有路径归属 ${ownership}，建议使用 executor: ${executor}`,
+        recommendation: `All paths belong to ${ownership}, recommend executor: ${executor}`,
       };
     }
 
-    // mixed：生成拆分建议
+    // mixed: generate split suggestions
     const splits: Array<{ executor: StepExecutor; paths: string[] }> = [];
     for (const [ownership, paths] of classified.entries()) {
       if (paths.length === 0) continue;
       if (ownership === "shared" || ownership === "unknown") {
-        // shared/unknown 不能自动拆分，需要用户澄清
+        // shared/unknown cannot be auto-split, need user clarification
         continue;
       }
       splits.push({
@@ -78,12 +105,12 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
 
     const sharedPaths = classification.shared;
     const unknownPaths = classification.unknown;
-    let recommendation = `路径归属混合，建议拆成 ${splits.length} 个 step。`;
+    let recommendation = `Mixed path ownership, suggest splitting into ${splits.length} steps.`;
     if (sharedPaths.length > 0) {
-      recommendation += ` shared 路径需要澄清归属: ${sharedPaths.join(", ")}`;
+      recommendation += ` Shared paths need clarification: ${sharedPaths.join(", ")}`;
     }
     if (unknownPaths.length > 0) {
-      recommendation += ` unknown 路径需要更新 .codecgc/config/routing.yaml: ${unknownPaths.join(", ")}`;
+      recommendation += ` Unknown paths need routing.yaml update: ${unknownPaths.join(", ")}`;
     }
 
     return {
@@ -106,7 +133,7 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
         unknown: [],
       },
       is_mixed: false,
-      recommendation: "路由判断失败",
+      recommendation: "Route determination failed",
       error: error instanceof Error ? error.message : String(error),
     };
   }
@@ -128,4 +155,78 @@ function ownershipToExecutor(ownership: PathOwnership): StepExecutor {
     default:
       return "orchestration";
   }
+}
+
+/**
+ * executor_hint → StepExecutor
+ */
+function hintToExecutor(hint: "frontend" | "backend" | "docs"): StepExecutor {
+  return hint as StepExecutor;
+}
+
+/**
+ * Build classification from hint (for explicit declaration scenario)
+ */
+function buildClassificationFromHint(
+  paths: string[],
+  hint: "frontend" | "backend" | "docs"
+): Record<PathOwnership, string[]> {
+  const classification: Record<PathOwnership, string[]> = {
+    backend: [],
+    frontend: [],
+    shared: [],
+    docs: [],
+    unknown: [],
+  };
+  classification[hint] = paths;
+  return classification;
+}
+
+/**
+ * Handle executor_hint="both" case (both frontend and backend need changes)
+ */
+async function handleBothHint(
+  paths: string[],
+  projectRoot: string
+): Promise<RouteResult> {
+  // Use directory convention + routing.yaml for auto-split
+  const routing = await readRouting(projectRoot);
+  const classified = classifyPaths(paths, routing);
+
+  const classification: Record<PathOwnership, string[]> = {
+    backend: classified.get("backend") ?? [],
+    frontend: classified.get("frontend") ?? [],
+    shared: classified.get("shared") ?? [],
+    docs: classified.get("docs") ?? [],
+    unknown: classified.get("unknown") ?? [],
+  };
+
+  const splits: Array<{ executor: StepExecutor; paths: string[] }> = [];
+
+  if (classification.frontend.length > 0) {
+    splits.push({ executor: "frontend", paths: classification.frontend });
+  }
+  if (classification.backend.length > 0) {
+    splits.push({ executor: "backend", paths: classification.backend });
+  }
+  if (classification.docs.length > 0) {
+    splits.push({ executor: "docs", paths: classification.docs });
+  }
+
+  let recommendation = `Based on executor_hint="both", auto-split into ${splits.length} steps.`;
+  if (classification.shared.length > 0) {
+    recommendation += ` Shared paths need clarification: ${classification.shared.join(", ")}`;
+  }
+  if (classification.unknown.length > 0) {
+    recommendation += ` Unknown paths need routing.yaml update: ${classification.unknown.join(", ")}`;
+  }
+
+  return {
+    success: true,
+    paths,
+    classification,
+    is_mixed: true,
+    recommended_split: splits,
+    recommendation,
+  };
 }

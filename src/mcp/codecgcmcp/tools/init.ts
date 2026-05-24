@@ -260,6 +260,42 @@ MCP 可用时优先调用 codecgcmcp 工具：
 - \`codecgc.fix\` — 执行 issue 修复
 - \`codecgc.test\` — 执行测试
 - \`codecgc.review\` — 审核执行结果
+- \`codecgc.route\` — 路径归属判断（支持 executor_hint）
+
+## 混合路由策略
+
+\`codecgc.route\` 支持三层路由策略（优先级从高到低）：
+
+### 1. executor_hint（显式声明，优先级最高）
+
+根据用户需求的**语义**判断，直接传递 \`executor_hint\` 参数：
+
+- **前端任务**（UI、组件、样式、前端交互）→ \`executor_hint: "frontend"\`
+  - 示例："前端工作台接入 API"、"Dashboard 显示调度状态"、"修改按钮样式"
+- **后端任务**（API、数据库、服务端逻辑）→ \`executor_hint: "backend"\`
+  - 示例："后端 API 增加字段"、"数据库迁移"、"修复认证逻辑"
+- **文档任务**（README、CHANGELOG、设计文档）→ \`executor_hint: "docs"\`
+  - 示例："更新 API 文档"、"补充安装说明"
+- **全栈任务**（前后端都要改）→ \`executor_hint: "both"\`
+  - 示例："新增用户管理功能"、"实现完整的登录流程"
+  - 系统会自动拆分为前端 + 后端两个步骤
+
+**使用场景：**
+- 用户需求明确提到"前端"、"后端"、"UI"、"API"等关键词
+- 路径可能有歧义（如 \`frontend/src/app/services/api.ts\`），但语义明确是前端任务
+- 避免路由规则误判
+
+### 2. 目录约定（次优先级）
+
+如果没有 \`executor_hint\`，优先匹配目录约定：
+
+- \`**/frontend/**\` → frontend
+- \`**/backend/**\` → backend
+- \`**/docs/**\` → docs
+
+### 3. routing.yaml 规则（兜底）
+
+如果目录约定也不匹配，使用 \`.codecgc/config/routing.yaml\` 的扩展名和路径模式规则。
 
 ## 写入边界
 

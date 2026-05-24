@@ -58,12 +58,17 @@ const TOOLS: Tool[] = [
   },
   {
     name: "codecgc.route",
-    description: "根据路径判断归属（backend/frontend/docs/orchestration），推荐 executor",
+    description: "根据路径判断归属（backend/frontend/docs/orchestration），推荐 executor。支持混合路由策略：1) executor_hint 显式声明（优先级最高）；2) 目录约定；3) routing.yaml 规则",
     inputSchema: {
       type: "object",
       properties: {
         paths: { type: "array", items: { type: "string" }, description: "待分类的路径列表" },
         cd: { type: "string", description: "项目根目录" },
+        executor_hint: {
+          type: "string",
+          enum: ["frontend", "backend", "docs", "both"],
+          description: "可选。显式声明 executor（优先级最高）。frontend=前端任务，backend=后端任务，docs=文档任务，both=前后端都要改（自动拆分）",
+        },
       },
       required: ["paths"],
     },
