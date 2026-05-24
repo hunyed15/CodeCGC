@@ -33,7 +33,7 @@ codecgc.review({
 审核硬规则：
 - audit 必须是真实执行，不能是 dry-run
 - executor 归属必须正确（前端用 Gemini，后端用 Codex）
-- 变更路径必须符合 routing.yaml
+- 变更路径必须符合 `.codecgc/config/routing.yaml`
 - 路径越界必须驳回
 - 验收标准未满足必须驳回
 

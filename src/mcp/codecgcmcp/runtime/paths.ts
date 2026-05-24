@@ -89,7 +89,7 @@ export function auditDir(workflowDir: string): string {
 }
 
 /**
- * routing.yaml 路径（位于 .codecgc/ 内）
+ * 路由配置路径（.codecgc/config/routing.yaml）
  */
 export function routingFile(projectRoot: string): string {
   return join(codecgcRoot(projectRoot), "config", "routing.yaml");

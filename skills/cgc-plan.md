@@ -13,7 +13,7 @@ description: 为 workflow 规划执行步骤
 1. 读取 workflow 的 description
 2. 分析需求，拆分为多个步骤
 3. 每个步骤指定 executor（backend/frontend/docs/orchestration）
-4. 根据 `model-routing.yaml` 验证路径归属
+4. 根据 `.codecgc/config/routing.yaml` 验证路径归属
 5. 调用 `codecgc.plan` 写入步骤
 
 步骤规划原则：

@@ -2,6 +2,23 @@
 
 All notable changes to CodeCGC will be documented in this file.
 
+## [1.0.2] - 2026-05-24
+
+### 🐛 Fixes
+
+#### 初始化诊断可见性
+- **修复**：`codecgc.init` 返回项目级 skills 的源目录、目标目录、新增/跳过列表和 warnings，避免 `/cgc-init` 静默成功但无法判断 skills 是否释放
+- **修复**：`codecgc.doctor` 检查 `cgc`、`cgc-init`、`cgc-mcp` 是否在 PATH 中，便于定位终端命令不可用问题
+
+#### `.codecgc/` 命名一致性
+- **修复**：README、skills、CLI 描述和 doctor 提示统一使用 `.codecgc/` 与 `.codecgc/config/routing.yaml`
+- **修复**：用户可见提示不再误写为 `codecgc/` 或 `model-routing.yaml`
+
+### 📝 Docs
+- 新增 `cgc-init` 命令不可用、项目级 skills 未显示的排障说明
+
+---
+
 ## [1.0.1] - 2026-05-24
 
 ### 🐛 Fixes

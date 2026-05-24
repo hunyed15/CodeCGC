@@ -83,7 +83,7 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
       recommendation += ` shared 路径需要澄清归属: ${sharedPaths.join(", ")}`;
     }
     if (unknownPaths.length > 0) {
-      recommendation += ` unknown 路径需要更新 model-routing.yaml: ${unknownPaths.join(", ")}`;
+      recommendation += ` unknown 路径需要更新 .codecgc/config/routing.yaml: ${unknownPaths.join(", ")}`;
     }
 
     return {

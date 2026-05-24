@@ -78,7 +78,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "codecgc.init",
-    description: "初始化项目（创建 .codecgc/ 目录、routing.yaml、.mcp.json、.claude/CLAUDE.md）",
+    description: "初始化项目（创建 .codecgc/ 目录、.codecgc/config/routing.yaml、.mcp.json、.claude/CLAUDE.md）",
     inputSchema: {
       type: "object",
       properties: {

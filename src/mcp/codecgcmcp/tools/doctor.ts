@@ -3,6 +3,7 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { resolveCliCommand } from "../../../shared/process.js";
 import { resolveProjectRoot, codecgcRoot, routingFile } from "../runtime/paths.js";
+import which from "which";
 
 export interface DoctorArgs {
   cd?: string;
@@ -28,11 +29,11 @@ export interface DoctorResult {
  *
  * 检查项：
  * 1. Node.js 版本（>= 20）
- * 2. Codex CLI 可用性
- * 3. Gemini CLI 可用性
- * 4. 项目结构（codecgc/ 目录）
- * 5. 配置文件（model-routing.yaml / .mcp.json）
- * 6. 路由策略合法性
+ * 2. CodeCGC CLI 可用性（cgc / cgc-init / cgc-mcp）
+ * 3. Codex CLI 可用性
+ * 4. Gemini CLI 可用性
+ * 5. 项目结构（.codecgc/ 目录）
+ * 6. 配置文件（.codecgc/config/routing.yaml / .mcp.json）
  */
 export async function doctor(args: DoctorArgs): Promise<DoctorResult> {
   try {
@@ -40,6 +41,9 @@ export async function doctor(args: DoctorArgs): Promise<DoctorResult> {
     const checks: CheckResult[] = [];
 
     checks.push(checkNodeVersion());
+    checks.push(await checkPathCommand("cgc", "CodeCGC CLI"));
+    checks.push(await checkPathCommand("cgc-init", "CodeCGC init 命令"));
+    checks.push(await checkPathCommand("cgc-mcp", "CodeCGC MCP 命令"));
     checks.push(await checkCodexCli());
     checks.push(await checkGeminiCli());
     checks.push(checkProjectStructure(projectRoot));
@@ -71,6 +75,23 @@ export async function doctor(args: DoctorArgs): Promise<DoctorResult> {
       checks: [],
       recommendation: "诊断失败",
       error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function checkPathCommand(command: string, label: string): Promise<CheckResult> {
+  try {
+    const resolved = await which(command);
+    return {
+      name: label,
+      status: "ok",
+      detail: resolved,
+    };
+  } catch (error) {
+    return {
+      name: label,
+      status: "error",
+      detail: `未在 PATH 中找到 ${command}。请重新全局安装 @hunyed15/codecgc，或把 npm global bin 目录加入 PATH。`,
     };
   }
 }
@@ -128,7 +149,7 @@ function checkProjectStructure(projectRoot: string): CheckResult {
     return {
       name: "项目结构",
       status: "error",
-      detail: `codecgc/ 目录不存在，请运行 codecgc.init`,
+      detail: `.codecgc/ 目录不存在，请运行 codecgc.init`,
     };
   }
   const required = ["features", "issues"];
@@ -140,7 +161,7 @@ function checkProjectStructure(projectRoot: string): CheckResult {
       detail: `缺少子目录: ${missing.join(", ")}`,
     };
   }
-  return { name: "项目结构", status: "ok", detail: `codecgc/ 完整` };
+  return { name: "项目结构", status: "ok", detail: `.codecgc/ 完整` };
 }
 
 function checkRoutingFile(projectRoot: string): CheckResult {
@@ -149,7 +170,7 @@ function checkRoutingFile(projectRoot: string): CheckResult {
     return {
       name: "路由策略",
       status: "warn",
-      detail: `model-routing.yaml 不存在，将使用默认策略`,
+      detail: `.codecgc/config/routing.yaml 不存在，将使用默认策略`,
     };
   }
   return { name: "路由策略", status: "ok", detail: file };

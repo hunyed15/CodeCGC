@@ -21,6 +21,14 @@ export interface InitResult {
   project_root: string;
   created_files: string[];
   skipped_files: string[];
+  warnings: string[];
+  project_skills: {
+    source_dir: string;
+    target_dir: string;
+    released: string[];
+    skipped: string[];
+    missing_source: boolean;
+  };
   recommendation: string;
   error?: string;
 }
@@ -32,6 +40,7 @@ export async function init(args: InitArgs): Promise<InitResult> {
 
     const created: string[] = [];
     const skipped: string[] = [];
+    const warnings: string[] = [];
 
     // 1. 创建 .codecgc/ 目录结构
     const root = codecgcRoot(projectRoot);
@@ -92,21 +101,34 @@ export async function init(args: InitArgs): Promise<InitResult> {
     }
 
     // 6. 释放项目级 skills 到 .claude/skills/<name>/SKILL.md
-    const skillsReleased = await releaseProjectSkills(projectRoot, force);
-    if (skillsReleased.length > 0) {
-      created.push(`.claude/skills/ (${skillsReleased.length} skills)`);
+    const skillsResult = await releaseProjectSkills(projectRoot, force);
+    if (skillsResult.released.length > 0) {
+      created.push(`.claude/skills/ (${skillsResult.released.length} skills)`);
+    }
+    if (skillsResult.skipped.length > 0) {
+      skipped.push(`.claude/skills/ (${skillsResult.skipped.length} skills 已存在)`);
+    }
+    if (skillsResult.missing_source) {
+      warnings.push(`未找到包内 skills 源目录: ${skillsResult.source_dir}`);
+    } else if (skillsResult.released.length === 0 && skillsResult.skipped.length === 0) {
+      warnings.push(`未释放任何项目级 skill，请检查包内 skills 目录: ${skillsResult.source_dir}`);
     }
 
     const totalCreated = created.length;
+    const skillSummary = skillsResult.missing_source
+      ? "项目级 skills 未释放：未找到包内 skills 源目录。"
+      : `项目级 skills：新增 ${skillsResult.released.length} 个，已存在 ${skillsResult.skipped.length} 个，目录 ${skillsResult.target_dir}`;
     return {
       success: true,
       project_root: projectRoot,
       created_files: created,
       skipped_files: skipped,
+      warnings,
+      project_skills: skillsResult,
       recommendation:
         totalCreated === 0
-          ? "项目已初始化，无需重复操作。"
-          : `已创建 ${totalCreated} 项。下一步：调用 codecgc.entry 创建第一个 workflow。`,
+          ? `项目已初始化，无需重复操作。${skillSummary}`
+          : `已创建 ${totalCreated} 项。${skillSummary} 下一步：调用 codecgc.entry 创建第一个 workflow。`,
     };
   } catch (error) {
     return {
@@ -114,6 +136,14 @@ export async function init(args: InitArgs): Promise<InitResult> {
       project_root: args.cd ?? process.cwd(),
       created_files: [],
       skipped_files: [],
+      warnings: [],
+      project_skills: {
+        source_dir: "",
+        target_dir: "",
+        released: [],
+        skipped: [],
+        missing_source: true,
+      },
       recommendation: "初始化失败",
       error: error instanceof Error ? error.message : String(error),
     };
@@ -162,13 +192,24 @@ function getDefaultMcpConfig() {
 /**
  * 从包的 skills/ 目录读取非全局 skill，写入项目 .claude/skills/<name>/SKILL.md
  */
-async function releaseProjectSkills(projectRoot: string, force: boolean): Promise<string[]> {
+async function releaseProjectSkills(projectRoot: string, force: boolean): Promise<InitResult["project_skills"]> {
   // 从编译后位置回溯到包根: dist/mcp/codecgcmcp/tools/ → 包根/skills/
   const skillsSourceDir = join(__dirname, "..", "..", "..", "..", "skills");
-  if (!existsSync(skillsSourceDir)) return [];
+  const skillsTargetDir = join(projectRoot, ".claude", "skills");
+  const result: InitResult["project_skills"] = {
+    source_dir: skillsSourceDir,
+    target_dir: skillsTargetDir,
+    released: [],
+    skipped: [],
+    missing_source: false,
+  };
+
+  if (!existsSync(skillsSourceDir)) {
+    result.missing_source = true;
+    return result;
+  }
 
   const files = readdirSync(skillsSourceDir).filter(f => f.endsWith(".md"));
-  const released: string[] = [];
 
   for (const file of files) {
     const name = file.replace(/\.md$/, "");
@@ -177,15 +218,18 @@ async function releaseProjectSkills(projectRoot: string, force: boolean): Promis
     const destDir = join(projectRoot, ".claude", "skills", name);
     const destFile = join(destDir, "SKILL.md");
 
-    if (existsSync(destFile) && !force) continue;
+    if (existsSync(destFile) && !force) {
+      result.skipped.push(name);
+      continue;
+    }
 
     await ensureDir(destDir);
     const content = await readFile(join(skillsSourceDir, file), "utf-8");
     await writeFile(destFile, content, "utf-8");
-    released.push(name);
+    result.released.push(name);
   }
 
-  return released;
+  return result;
 }
 
 function getDefaultClaudeMd(): string {
@@ -224,4 +268,3 @@ Claude 不应直接修改产品源码——后端交 Codex，前端交 Gemini。
 \`\`\`
 `;
 }
-

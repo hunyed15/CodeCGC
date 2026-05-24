@@ -145,7 +145,7 @@ program
 
 program
   .command("init")
-  .description("初始化项目（创建 codecgc/ 目录和配置文件）")
+  .description("初始化项目（创建 .codecgc/ 目录和配置文件）")
   .option("--cd <dir>", "项目根目录", process.cwd())
   .option("--force", "强制覆盖已存在的文件")
   .action(async (options) => {

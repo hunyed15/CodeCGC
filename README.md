@@ -54,7 +54,7 @@ your-project/
 │   ├── issues/               # issue workflow 产物
 │   ├── execution/            # 执行审计记录
 │   └── ...                   # 其他工作流产物
-├── model-routing.yaml        # 路径归属策略
+├── .codecgc/config/routing.yaml  # 路径归属策略
 ├── .claude/CLAUDE.md         # AI 提示词（Claude Code 读取）
 └── .mcp.json                 # MCP 服务器配置
 ```
@@ -109,14 +109,14 @@ your-project/
 
 1. **entry** — 创建 workflow（feature 或 issue）
 2. **plan** — Claude 规划步骤，指定每步的 executor 和路径
-3. **route** — 根据 `routing.yaml` 验证路径归属
+3. **route** — 根据 `.codecgc/config/routing.yaml` 验证路径归属
 4. **build/fix** — 调用 Codex（后端）或 Gemini（前端）执行
 5. **review** — Claude 审核执行结果，通过或打回
 6. 打回后回到 build/fix 继续，通过则关闭
 
 ## 路由策略
 
-`model-routing.yaml` 定义路径归属：
+`.codecgc/config/routing.yaml` 定义路径归属：
 
 ```yaml
 version: 1
@@ -139,6 +139,49 @@ rules:
 |------|------|
 | `cgc-init` | 初始化项目 |
 | `cgc-mcp` | 启动 MCP 服务器 |
+
+## 常见问题
+
+### 终端提示 `cgc-init` 命令不存在
+
+确认安装的是包含 `cgc-init` 的新版包，并检查 npm 全局 bin 目录是否在 `PATH` 中：
+
+```bash
+npm install -g @hunyed15/codecgc@latest
+npm config get prefix
+```
+
+Windows 下可进一步确认：
+
+```powershell
+where cgc
+where cgc-init
+where cgc-mcp
+```
+
+macOS / Linux 下可进一步确认：
+
+```bash
+which cgc
+which cgc-init
+which cgc-mcp
+```
+
+如果 `cgc` 可用但 `cgc-init` 不可用，也可以先使用等价命令：
+
+```bash
+cgc init
+```
+
+### `/cgc-init` 成功但项目里没有其它 skills
+
+查看初始化结果里的 `project_root` 和 `project_skills.target_dir`。项目级 skills 应释放到：
+
+```text
+<project>/.claude/skills/<skill-name>/SKILL.md
+```
+
+如果 `warnings` 提示未找到包内 skills 源目录，请重新全局安装包后再次运行 `/cgc-init`。
 
 ## 环境要求
 

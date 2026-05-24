@@ -5,7 +5,7 @@ import { routingFile } from "./paths.js";
 import { minimatch } from "minimatch";
 
 /**
- * 默认路由规则（当 model-routing.yaml 不存在时）
+ * 默认路由规则（当 .codecgc/config/routing.yaml 不存在时）
  */
 const DEFAULT_ROUTING: ModelRouting = {
   version: 1,
@@ -39,7 +39,7 @@ const DEFAULT_ROUTING: ModelRouting = {
 };
 
 /**
- * 读取 model-routing.yaml
+ * 读取 .codecgc/config/routing.yaml
  */
 export async function readRouting(projectRoot: string): Promise<ModelRouting> {
   const file = routingFile(projectRoot);
@@ -48,7 +48,7 @@ export async function readRouting(projectRoot: string): Promise<ModelRouting> {
   }
   const routing = await readYaml<ModelRouting>(file);
   if (!routing || typeof routing !== "object" || !Array.isArray(routing.rules)) {
-    throw new Error(`无效的 model-routing.yaml: ${file}`);
+    throw new Error(`无效的 .codecgc/config/routing.yaml: ${file}`);
   }
   return routing;
 }
