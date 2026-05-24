@@ -1,12 +1,12 @@
 /**
- * 通用 CLI HTTP 服务
+ * Generic CLI HTTP service
  *
- * 用途：绕过 MCP StdioServerTransport 的环境限制
- * 架构：独立进程 + HTTP API，codecgcmcp 通过 fetch 调用
- * 支持：Gemini、Codex、OpenCode 等 CLI
+ * Purpose: Bypass MCP StdioServerTransport environment limitations
+ * Architecture: Independent process + HTTP API, codecgcmcp calls via fetch
+ * Support: Gemini, Codex, OpenCode, etc.
  *
- * 启动：node cli-http-service.cjs [port]
- * 默认端口：37428
+ * Usage: node cli-http-service.cjs [port]
+ * Default port: 37428
  *
  * API:
  *   POST /execute
@@ -22,7 +22,29 @@ const { spawn } = require("child_process");
 const { randomBytes } = require("crypto");
 
 const PORT = parseInt(process.argv[2] || "37428", 10);
-const sessions = new Map(); // requestId -> { success, sessionId, agentMessages, error }
+const sessions = new Map(); // requestId -> { success, sessionId, agentMessages, error, timestamp }
+
+// Limits to prevent memory exhaustion
+const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_BUFFER_SIZE = 1 * 1024 * 1024; // 1MB
+const MAX_STDERR_SIZE = 500 * 1024; // 500KB
+const MAX_MESSAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Cleanup expired sessions every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [requestId, session] of sessions.entries()) {
+    if (now - session.timestamp > SESSION_TTL_MS) {
+      sessions.delete(requestId);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    console.error(`[cleanup] Removed ${cleaned} expired sessions`);
+  }
+}, 5 * 60 * 1000);
 
 function tryParseJson(line) {
   try {
@@ -33,14 +55,14 @@ function tryParseJson(line) {
 }
 
 /**
- * 通用 CLI spawn 函数
+ * Generic CLI spawn function
  * @param {object} opts
- * @param {string} opts.cli - CLI 类型 (gemini/codex/opencode)
- * @param {string} opts.cmd - 命令路径
- * @param {string[]} opts.args - 命令参数
- * @param {string} opts.cd - 工作目录
- * @param {object} opts.env - 环境变量
- * @param {number} opts.timeoutMs - 超时时间
+ * @param {string} opts.cli - CLI type (gemini/codex/opencode)
+ * @param {string} opts.cmd - Command path
+ * @param {string[]} opts.args - Command arguments
+ * @param {string} opts.cd - Working directory
+ * @param {object} opts.env - Environment variables
+ * @param {number} opts.timeoutMs - Timeout in milliseconds
  */
 function spawnCLI(opts) {
   const requestId = randomBytes(8).toString("hex");
@@ -65,23 +87,33 @@ function spawnCLI(opts) {
     if (resolved) return;
     resolved = true;
     try {
-      if (process.platform === "win32") {
-        require("child_process").execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
-      } else {
-        process.kill(-proc.pid, "SIGTERM");
+      if (proc.pid) {
+        if (process.platform === "win32") {
+          require("child_process").execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+        } else {
+          process.kill(-proc.pid, "SIGTERM");
+        }
       }
-    } catch {}
+    } catch
     sessions.set(requestId, {
       success: false,
       sessionId: "",
       agentMessages: "",
-      error: `执行超时（${opts.timeoutMs}ms）`,
+      error: `Execution timeout (${opts.timeoutMs}ms)`,
+      timestamp: Date.now(),
     });
   }, opts.timeoutMs);
 
   proc.stdout.on("data", (chunk) => {
     const data = chunk.toString();
     console.error(`[${cliType} stdout] ${data.slice(0, 100)}`);
+
+    // Prevent buffer overflow
+    if (buffer.length + data.length > MAX_BUFFER_SIZE) {
+      console.error(`[${cliType}] Buffer overflow, truncating`);
+      buffer = buffer.slice(-MAX_BUFFER_SIZE / 2); // Keep last half
+    }
+
     buffer += data;
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
@@ -90,7 +122,7 @@ function spawnCLI(opts) {
       const event = tryParseJson(line);
       if (!event) continue;
 
-      // 提取 session_id / thread_id（Gemini 用 session_id，Codex 用 thread_id）
+      // Extract session_id / thread_id (Gemini uses session_id, Codex uses thread_id)
       if (event.session_id && typeof event.session_id === "string") {
         sessionId = event.session_id;
       }
@@ -98,17 +130,21 @@ function spawnCLI(opts) {
         sessionId = event.thread_id;
       }
 
-      // 提取 assistant 消息（支持多种格式）
+      // Extract assistant messages (support multiple formats)
       if (event.type === "message" && event.role === "assistant" && typeof event.content === "string") {
-        agentMessages += event.content;
+        if (agentMessages.length + event.content.length <= MAX_MESSAGE_SIZE) {
+          agentMessages += event.content;
+        }
       }
       if (event.item && event.item.type === "agent_message" && typeof event.item.text === "string") {
-        agentMessages += event.item.text;
+        if (agentMessages.length + event.item.text.length <= MAX_MESSAGE_SIZE) {
+          agentMessages += event.item.text;
+        }
       }
 
-      // 提取错误信息
+      // Extract error messages
       if (event.type === "error" && typeof event.message === "string") {
-        // 忽略 Gemini 的 "Reconnecting..." 消息
+        // Ignore Gemini's "Reconnecting..." messages
         if (!/^Reconnecting\.\.\.\s+\d+\/\d+/.test(event.message)) {
           errorMessage = event.message;
         }
@@ -117,7 +153,7 @@ function spawnCLI(opts) {
         errorMessage = JSON.stringify(event);
       }
 
-      // 检测完成信号（Gemini: turn.completed, Codex: result）
+      // Detect completion signal (Gemini: turn.completed, Codex: result)
       if (event.type === "turn.completed" || event.type === "result") {
         if (!resolved) {
           resolved = true;
@@ -127,6 +163,7 @@ function spawnCLI(opts) {
             sessionId,
             agentMessages,
             error: errorMessage || undefined,
+            timestamp: Date.now(),
           });
         }
         setTimeout(() => { try { proc.kill(); } catch {} }, 300);
@@ -135,8 +172,15 @@ function spawnCLI(opts) {
   });
 
   proc.stderr.on("data", (chunk) => {
-    stderrOutput += chunk.toString();
-    console.error(`[${cliType} stderr] ${chunk.toString().slice(0, 100)}`);
+    const data = chunk.toString();
+
+    // Prevent stderr overflow
+    if (stderrOutput.length + data.length > MAX_STDERR_SIZE) {
+      stderrOutput = stderrOutput.slice(-MAX_STDERR_SIZE / 2); // Keep last half
+    }
+
+    stderrOutput += data;
+    console.error(`[${cliType} stderr] ${data.slice(0, 100)}`);
   });
 
   proc.on("exit", () => {
@@ -149,6 +193,7 @@ function spawnCLI(opts) {
       sessionId,
       agentMessages,
       error: errorMessage || (stderrOutput ? `Stderr: ${stderrOutput.slice(0, 200)}` : undefined),
+      timestamp: Date.now(),
     });
   });
 
@@ -161,6 +206,7 @@ function spawnCLI(opts) {
       sessionId: "",
       agentMessages: "",
       error: err.message,
+      timestamp: Date.now(),
     });
   });
 
@@ -170,13 +216,29 @@ function spawnCLI(opts) {
 const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/execute") {
     let body = "";
-    req.on("data", chunk => { body += chunk.toString(); });
+    let bodySize = 0;
+
+    req.on("data", chunk => {
+      bodySize += chunk.length;
+      if (bodySize > MAX_BODY_SIZE) {
+        req.destroy();
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Request body too large" }));
+        return;
+      }
+      body += chunk.toString();
+    });
+
     req.on("end", () => {
       try {
         const opts = JSON.parse(body);
-        // 验证必需字段
+        // Validate required fields
         if (!opts.cmd || !Array.isArray(opts.args)) {
           throw new Error("Missing required fields: cmd, args");
+        }
+        // Validate timeoutMs
+        if (opts.timeoutMs && (typeof opts.timeoutMs !== "number" || opts.timeoutMs <= 0 || opts.timeoutMs > 3600000)) {
+          throw new Error("Invalid timeoutMs: must be between 1 and 3600000");
         }
         const requestId = spawnCLI(opts);
         res.writeHead(202, { "Content-Type": "application/json" });
@@ -184,6 +246,14 @@ const server = http.createServer((req, res) => {
       } catch (e) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+
+    req.on("error", (err) => {
+      console.error(`[HTTP] Request error:`, err);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Request processing failed" }));
       }
     });
   } else if (req.method === "GET" && req.url.startsWith("/result/")) {

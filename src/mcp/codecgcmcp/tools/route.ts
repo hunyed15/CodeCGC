@@ -41,6 +41,32 @@ export interface RouteResult {
  */
 export async function route(args: RouteArgs): Promise<RouteResult> {
   try {
+    // Input validation
+    if (!args.paths || !Array.isArray(args.paths)) {
+      throw new Error("paths must be a non-empty array");
+    }
+
+    if (args.paths.length === 0) {
+      throw new Error("paths array cannot be empty");
+    }
+
+    if (args.paths.length > 1000) {
+      throw new Error("paths array too large (max 1000)");
+    }
+
+    // Validate path elements
+    for (const path of args.paths) {
+      if (typeof path !== "string") {
+        throw new Error(`Invalid path type: expected string, got ${typeof path}`);
+      }
+      if (path.length === 0) {
+        throw new Error("Empty path string not allowed");
+      }
+      if (path.length > 500) {
+        throw new Error(`Path too long (max 500 chars): ${path.slice(0, 50)}...`);
+      }
+    }
+
     const projectRoot = resolveProjectRoot(args.cd);
 
     // Priority 1: Explicit declaration (executor_hint)
@@ -119,11 +145,19 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
     const sharedPaths = classification.shared;
     const unknownPaths = classification.unknown;
     let recommendation = `Mixed path ownership, suggest splitting into ${splits.length} steps.`;
+
+    // Limit output length to prevent excessive strings
     if (sharedPaths.length > 0) {
-      recommendation += ` Shared paths need clarification: ${sharedPaths.join(", ")}`;
+      const pathList = sharedPaths.length > 5
+        ? `${sharedPaths.slice(0, 5).join(", ")} (and ${sharedPaths.length - 5} more)`
+        : sharedPaths.join(", ");
+      recommendation += ` Shared paths need clarification: ${pathList}`;
     }
     if (unknownPaths.length > 0) {
-      recommendation += ` Unknown paths need routing.yaml update: ${unknownPaths.join(", ")}`;
+      const pathList = unknownPaths.length > 5
+        ? `${unknownPaths.slice(0, 5).join(", ")} (and ${unknownPaths.length - 5} more)`
+        : unknownPaths.join(", ");
+      recommendation += ` Unknown paths need routing.yaml update: ${pathList}`;
     }
 
     return {
@@ -230,10 +264,16 @@ async function handleBothHint(
   if (splits.length === 0) {
     let recommendation = `Cannot auto-split with executor_hint="both": all paths are shared/unknown.`;
     if (classification.shared.length > 0) {
-      recommendation += ` Shared paths need clarification: ${classification.shared.join(", ")}`;
+      const pathList = classification.shared.length > 5
+        ? `${classification.shared.slice(0, 5).join(", ")} (and ${classification.shared.length - 5} more)`
+        : classification.shared.join(", ");
+      recommendation += ` Shared paths need clarification: ${pathList}`;
     }
     if (classification.unknown.length > 0) {
-      recommendation += ` Unknown paths need routing.yaml update: ${classification.unknown.join(", ")}`;
+      const pathList = classification.unknown.length > 5
+        ? `${classification.unknown.slice(0, 5).join(", ")} (and ${classification.unknown.length - 5} more)`
+        : classification.unknown.join(", ");
+      recommendation += ` Unknown paths need routing.yaml update: ${pathList}`;
     }
     return {
       success: false,
@@ -247,10 +287,16 @@ async function handleBothHint(
 
   let recommendation = `Based on executor_hint="both", auto-split into ${splits.length} steps.`;
   if (classification.shared.length > 0) {
-    recommendation += ` Shared paths need clarification: ${classification.shared.join(", ")}`;
+    const pathList = classification.shared.length > 5
+      ? `${classification.shared.slice(0, 5).join(", ")} (and ${classification.shared.length - 5} more)`
+      : classification.shared.join(", ");
+    recommendation += ` Shared paths need clarification: ${pathList}`;
   }
   if (classification.unknown.length > 0) {
-    recommendation += ` Unknown paths need routing.yaml update: ${classification.unknown.join(", ")}`;
+    const pathList = classification.unknown.length > 5
+      ? `${classification.unknown.slice(0, 5).join(", ")} (and ${classification.unknown.length - 5} more)`
+      : classification.unknown.join(", ");
+    recommendation += ` Unknown paths need routing.yaml update: ${pathList}`;
   }
 
   return {

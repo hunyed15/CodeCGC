@@ -421,7 +421,15 @@ async function startCliHttpService(): Promise<void> {
       return;
     }
   } catch {
-    // Service not running, start it
+    // Service not running, continue to start it
+  }
+
+  // Check if service file exists
+  const fs = await import("fs");
+  if (!fs.existsSync(servicePath)) {
+    console.error(`[codecgcmcp] CLI HTTP service file not found: ${servicePath}`);
+    console.error(`[codecgcmcp] Skipping HTTP service startup`);
+    return;
   }
 
   try {
@@ -431,8 +439,30 @@ async function startCliHttpService(): Promise<void> {
       stdio: "ignore",
       windowsHide: true,
     });
+
+    // Handle spawn errors
+    proc.on("error", (err) => {
+      console.error(`[codecgcmcp] Failed to spawn CLI HTTP service:`, err);
+    });
+
     proc.unref(); // Let child process run independently
     console.error(`[codecgcmcp] CLI HTTP service started (PID: ${proc.pid})`);
+
+    // Wait a bit and verify service is actually running
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    try {
+      const verifyResponse = await fetch(`http://127.0.0.1:${HTTP_PORT}/health`, {
+        signal: AbortSignal.timeout(1000),
+      });
+      if (verifyResponse.ok) {
+        console.error(`[codecgcmcp] CLI HTTP service verified running`);
+      } else {
+        console.error(`[codecgcmcp] CLI HTTP service health check failed`);
+      }
+    } catch {
+      console.error(`[codecgcmcp] CLI HTTP service may not have started successfully`);
+    }
   } catch (error) {
     console.error(`[codecgcmcp] Failed to start CLI HTTP service:`, error);
   }
