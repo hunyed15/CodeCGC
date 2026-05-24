@@ -77,7 +77,20 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
     const isMixed = hasMixedOwnership(args.paths, routing);
 
     if (!isMixed) {
-      const ownership = Array.from(classified.keys())[0];
+      // Single ownership: find the non-empty category
+      let ownership: PathOwnership | undefined;
+      for (const [key, paths] of classified.entries()) {
+        if (paths.length > 0) {
+          ownership = key;
+          break;
+        }
+      }
+
+      if (!ownership) {
+        // All paths are empty or unclassified, default to orchestration
+        ownership = "unknown";
+      }
+
       const executor = ownershipToExecutor(ownership);
       return {
         success: true,
@@ -211,6 +224,25 @@ async function handleBothHint(
   }
   if (classification.docs.length > 0) {
     splits.push({ executor: "docs", paths: classification.docs });
+  }
+
+  // Edge case: all paths are shared/unknown, cannot auto-split
+  if (splits.length === 0) {
+    let recommendation = `Cannot auto-split with executor_hint="both": all paths are shared/unknown.`;
+    if (classification.shared.length > 0) {
+      recommendation += ` Shared paths need clarification: ${classification.shared.join(", ")}`;
+    }
+    if (classification.unknown.length > 0) {
+      recommendation += ` Unknown paths need routing.yaml update: ${classification.unknown.join(", ")}`;
+    }
+    return {
+      success: false,
+      paths,
+      classification,
+      is_mixed: true,
+      recommendation,
+      error: "Cannot determine split: all paths are shared or unknown",
+    };
   }
 
   let recommendation = `Based on executor_hint="both", auto-split into ${splits.length} steps.`;

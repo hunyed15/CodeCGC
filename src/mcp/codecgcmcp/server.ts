@@ -405,33 +405,42 @@ function validateInputSize(args: Record<string, unknown>): void {
 }
 
 /**
- * 启动 CLI HTTP 服务（后台进程）
+ * Start CLI HTTP service (background process)
  */
-function startCliHttpService(): void {
+async function startCliHttpService(): Promise<void> {
   const HTTP_PORT = 37428;
   const servicePath = join(__dirname, "runtime", "cli-http-service.cjs");
 
-  // 检查服务是否已经在运行
-  fetch(`http://127.0.0.1:${HTTP_PORT}/health`)
-    .then(() => {
-      console.error(`[codecgcmcp] CLI HTTP service already running on port ${HTTP_PORT}`);
-    })
-    .catch(() => {
-      // 服务未运行，启动它
-      console.error(`[codecgcmcp] Starting CLI HTTP service on port ${HTTP_PORT}...`);
-      const proc = spawn("node", [servicePath, String(HTTP_PORT)], {
-        detached: true,
-        stdio: "ignore",
-        windowsHide: true,
-      });
-      proc.unref(); // 让子进程独立运行，不阻塞父进程退出
-      console.error(`[codecgcmcp] CLI HTTP service started (PID: ${proc.pid})`);
+  try {
+    // Check if service is already running
+    const response = await fetch(`http://127.0.0.1:${HTTP_PORT}/health`, {
+      signal: AbortSignal.timeout(1000),
     });
+    if (response.ok) {
+      console.error(`[codecgcmcp] CLI HTTP service already running on port ${HTTP_PORT}`);
+      return;
+    }
+  } catch {
+    // Service not running, start it
+  }
+
+  try {
+    console.error(`[codecgcmcp] Starting CLI HTTP service on port ${HTTP_PORT}...`);
+    const proc = spawn("node", [servicePath, String(HTTP_PORT)], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    proc.unref(); // Let child process run independently
+    console.error(`[codecgcmcp] CLI HTTP service started (PID: ${proc.pid})`);
+  } catch (error) {
+    console.error(`[codecgcmcp] Failed to start CLI HTTP service:`, error);
+  }
 }
 
 async function main() {
-  // 启动 CLI HTTP 服务
-  startCliHttpService();
+  // Start CLI HTTP service
+  await startCliHttpService();
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
