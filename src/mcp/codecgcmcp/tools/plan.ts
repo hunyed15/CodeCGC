@@ -35,63 +35,140 @@ export interface PlanResult {
 }
 
 /**
- * codecgc.plan — 向 workflow 添加 steps
+ * codecgc.plan - Add steps to workflow
  *
- * 行为：
- * - 读取现有 workflow
- * - 验证 steps（路径归属、executor 匹配）
- * - 追加 steps 到 workflow.steps
- * - 写回 workflow.yaml
+ * Behavior:
+ * - Read existing workflow
+ * - Validate steps (path ownership, executor matching)
+ * - Append steps to workflow.steps
+ * - Write back to workflow.yaml
  */
 export async function plan(args: PlanArgs): Promise<PlanResult> {
-  const projectRoot = resolveProjectRoot(args.cd);
-  const workflow = await readWorkflow(projectRoot, args.kind, args.slug);
-  const routing = await readRouting(projectRoot);
-  const warnings: string[] = [];
-
-  for (const stepInput of args.steps) {
-    // 验证路径安全性
-    validateStepPaths(stepInput.paths);
-
-    // 验证路径归属
-    if (hasMixedOwnership(stepInput.paths, routing)) {
-      warnings.push(
-        `步骤 ${stepInput.id} 包含 mixed/shared/unknown 路径，建议拆分：\n${stepInput.paths.join(", ")}`
-      );
+  try {
+    // Input validation
+    if (!args.steps || !Array.isArray(args.steps)) {
+      throw new Error("steps must be a non-empty array");
     }
 
-    // 验证 executor 与路径匹配
-    const classified = classifyPaths(stepInput.paths, routing);
-    if (stepInput.executor === "backend" && !classified.has("backend")) {
-      warnings.push(`步骤 ${stepInput.id} 标记为 backend 但路径不包含后端文件`);
-    }
-    if (stepInput.executor === "frontend" && !classified.has("frontend")) {
-      warnings.push(`步骤 ${stepInput.id} 标记为 frontend 但路径不包含前端文件`);
+    if (args.steps.length === 0) {
+      throw new Error("steps array cannot be empty");
     }
 
-    // 添加步骤
-    const step: WorkflowStep = {
-      id: stepInput.id,
-      title: stepInput.title,
-      status: "pending",
-      executor: stepInput.executor,
-      task_id: stepInput.task_id,
-      summary: stepInput.summary,
-      paths: stepInput.paths,
-      constraints: stepInput.constraints,
-      acceptance: stepInput.acceptance,
-      cd: stepInput.cd,
+    if (args.steps.length > 100) {
+      throw new Error("steps array too large (max 100)");
+    }
+
+    // Validate kind and slug
+    if (!args.kind || !args.slug) {
+      throw new Error("kind and slug are required");
+    }
+
+    const projectRoot = resolveProjectRoot(args.cd);
+    const workflow = await readWorkflow(projectRoot, args.kind, args.slug);
+    const routing = await readRouting(projectRoot);
+    const warnings: string[] = [];
+
+    // Check for duplicate step IDs
+    const existingIds = new Set(workflow.steps?.map(s => s.id) || []);
+    const newIds = new Set<string>();
+
+    for (const stepInput of args.steps) {
+      // Validate step fields
+      if (!stepInput.id || typeof stepInput.id !== "string") {
+        throw new Error("step.id is required and must be a string");
+      }
+      if (stepInput.id.length > 50) {
+        throw new Error(`step.id too long (max 50 chars): ${stepInput.id}`);
+      }
+      if (existingIds.has(stepInput.id)) {
+        throw new Error(`Duplicate step.id: ${stepInput.id} already exists in workflow`);
+      }
+      if (newIds.has(stepInput.id)) {
+        throw new Error(`Duplicate step.id in input: ${stepInput.id}`);
+      }
+      newIds.add(stepInput.id);
+
+      if (!stepInput.title || typeof stepInput.title !== "string") {
+        throw new Error(`step.title is required for step ${stepInput.id}`);
+      }
+      if (stepInput.title.length > 200) {
+        throw new Error(`step.title too long (max 200 chars) for step ${stepInput.id}`);
+      }
+
+      if (!stepInput.executor) {
+        throw new Error(`step.executor is required for step ${stepInput.id}`);
+      }
+
+      if (!stepInput.task_id || typeof stepInput.task_id !== "string") {
+        throw new Error(`step.task_id is required for step ${stepInput.id}`);
+      }
+
+      if (!stepInput.summary || typeof stepInput.summary !== "string") {
+        throw new Error(`step.summary is required for step ${stepInput.id}`);
+      }
+      if (stepInput.summary.length > 1000) {
+        throw new Error(`step.summary too long (max 1000 chars) for step ${stepInput.id}`);
+      }
+
+      if (!Array.isArray(stepInput.paths)) {
+        throw new Error(`step.paths must be an array for step ${stepInput.id}`);
+      }
+      if (stepInput.paths.length > 100) {
+        throw new Error(`step.paths too large (max 100) for step ${stepInput.id}`);
+      }
+
+      // Validate path safety
+      validateStepPaths(stepInput.paths);
+
+      // Validate path ownership
+      if (hasMixedOwnership(stepInput.paths, routing)) {
+        warnings.push(
+          `Step ${stepInput.id} contains mixed/shared/unknown paths, suggest splitting:\n${stepInput.paths.slice(0, 5).join(", ")}${stepInput.paths.length > 5 ? ` (and ${stepInput.paths.length - 5} more)` : ""}`
+        );
+      }
+
+      // Validate executor matches paths
+      const classified = classifyPaths(stepInput.paths, routing);
+      if (stepInput.executor === "backend" && !classified.has("backend")) {
+        warnings.push(`Step ${stepInput.id} marked as backend but paths don't contain backend files`);
+      }
+      if (stepInput.executor === "frontend" && !classified.has("frontend")) {
+        warnings.push(`Step ${stepInput.id} marked as frontend but paths don't contain frontend files`);
+      }
+
+      // Add step
+      const step: WorkflowStep = {
+        id: stepInput.id,
+        title: stepInput.title,
+        status: "pending",
+        executor: stepInput.executor,
+        task_id: stepInput.task_id,
+        summary: stepInput.summary,
+        paths: stepInput.paths,
+        constraints: stepInput.constraints,
+        acceptance: stepInput.acceptance,
+        cd: stepInput.cd,
+      };
+      addStep(workflow, step);
+    }
+
+    await writeWorkflow(projectRoot, workflow);
+
+    return {
+      success: true,
+      kind: args.kind,
+      slug: args.slug,
+      steps_added: args.steps.length,
+      validation_warnings: warnings,
     };
-    addStep(workflow, step);
+  } catch (error) {
+    return {
+      success: false,
+      kind: args.kind,
+      slug: args.slug,
+      steps_added: 0,
+      validation_warnings: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
-
-  await writeWorkflow(projectRoot, workflow);
-
-  return {
-    success: true,
-    kind: args.kind,
-    slug: args.slug,
-    steps_added: args.steps.length,
-    validation_warnings: warnings,
-  };
 }

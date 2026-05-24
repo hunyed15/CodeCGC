@@ -30,45 +30,86 @@ export interface EntryResult {
 }
 
 /**
- * codecgc.entry — 创建或恢复一个 workflow 入口
+ * codecgc.entry - Create or restore a workflow entry
  *
- * 行为：
- * - 推断 kind（feature / issue），默认 feature
- * - 推断 slug：日期-需求关键词
- * - 如已存在同 slug 的 workflow，直接返回当前状态
- * - 否则创建空 workflow.yaml（无 steps，等待 plan 步骤填充）
+ * Behavior:
+ * - Infer kind (feature / issue), default feature
+ * - Infer slug: date-requirement-keywords
+ * - If workflow with same slug exists, return current state
+ * - Otherwise create empty workflow.yaml (no steps, waiting for plan phase)
  */
 export async function entry(args: EntryArgs): Promise<EntryResult> {
-  const projectRoot = resolveProjectRoot(args.cd);
-  const kind: WorkflowKind = args.kind ?? inferKind(args.description);
-  const slug = args.slug ?? slugify(extractKeyword(args.description), today());
-  const artifactClass: ArtifactClass = args.artifact_class ?? "product";
+  try {
+    // Input validation
+    if (!args.description || typeof args.description !== "string") {
+      throw new Error("description is required and must be a string");
+    }
 
-  const dir = resolveWorkflowDir(projectRoot, kind, slug);
-  const file = workflowFile(dir);
-  const isExisting = existsSync(file);
+    const trimmed = args.description.trim();
+    if (trimmed.length === 0) {
+      throw new Error("description cannot be empty");
+    }
 
-  let workflow;
-  if (isExisting) {
-    workflow = await readWorkflow(projectRoot, kind, slug);
-  } else {
-    workflow = createWorkflow({ kind, slug, artifactClass });
-    await writeWorkflow(projectRoot, workflow);
+    if (trimmed.length > 500) {
+      throw new Error("description too long (max 500 characters)");
+    }
+
+    // Validate slug if provided
+    if (args.slug) {
+      if (typeof args.slug !== "string" || args.slug.length === 0) {
+        throw new Error("slug must be a non-empty string");
+      }
+      if (args.slug.length > 100) {
+        throw new Error("slug too long (max 100 characters)");
+      }
+      if (!/^[a-z0-9-]+$/.test(args.slug)) {
+        throw new Error("slug must contain only lowercase letters, numbers, and hyphens");
+      }
+    }
+
+    const projectRoot = resolveProjectRoot(args.cd);
+    const kind: WorkflowKind = args.kind ?? inferKind(trimmed);
+    const slug = args.slug ?? slugify(extractKeyword(trimmed), today());
+    const artifactClass: ArtifactClass = args.artifact_class ?? "product";
+
+    const dir = resolveWorkflowDir(projectRoot, kind, slug);
+    const file = workflowFile(dir);
+    const isExisting = existsSync(file);
+
+    let workflow;
+    if (isExisting) {
+      workflow = await readWorkflow(projectRoot, kind, slug);
+    } else {
+      workflow = createWorkflow({ kind, slug, artifactClass });
+      await writeWorkflow(projectRoot, workflow);
+    }
+
+    const state = await inferWorkflowState(projectRoot, workflow);
+    const nextAction = recommendNextAction(state, kind);
+
+    return {
+      success: true,
+      kind,
+      slug,
+      workflow_dir: dir,
+      workflow_file: file,
+      state,
+      is_new: !isExisting,
+      next_action: nextAction,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      kind: args.kind ?? "feature",
+      slug: args.slug ?? "unknown",
+      workflow_dir: "",
+      workflow_file: "",
+      state: "error",
+      is_new: false,
+      next_action: "",
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
-
-  const state = await inferWorkflowState(projectRoot, workflow);
-  const nextAction = recommendNextAction(state, kind);
-
-  return {
-    success: true,
-    kind,
-    slug,
-    workflow_dir: dir,
-    workflow_file: file,
-    state,
-    is_new: !isExisting,
-    next_action: nextAction,
-  };
 }
 
 /**
@@ -82,15 +123,17 @@ function inferKind(description: string): WorkflowKind {
 }
 
 /**
- * 从需求描述中提取关键词作为 slug 基础
+ * Extract keywords from requirement description as slug base
  */
 function extractKeyword(description: string): string {
   const cleaned = description
     .replace(/[，。！？、；：""''「」（）()【】\[\]]/g, " ")
     .replace(/\s+/g, "-")
     .replace(/^-+|-+$/g, "");
-  // 取前 40 个字符
-  return cleaned.slice(0, 40) || "task";
+
+  // Take first 40 characters, fallback to "task" if empty
+  const result = cleaned.slice(0, 40).trim();
+  return result.length > 0 ? result : "task";
 }
 
 /**
