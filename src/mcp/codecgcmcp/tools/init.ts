@@ -1,8 +1,15 @@
-import { existsSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { writeFile, readFile } from "fs/promises";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { resolveProjectRoot, codecgcRoot, routingFile, ensureDir } from "../runtime/paths.js";
 import { writeYaml } from "../../../shared/yaml.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// 全局已有的 skill，不需要释放到项目级
+const GLOBAL_ONLY_SKILLS = ["cgc-init", "cgc"];
 
 export interface InitArgs {
   cd?: string;
@@ -75,13 +82,19 @@ export async function init(args: InitArgs): Promise<InitResult> {
       if (!content.includes(gitignoreRule)) {
         await writeFile(
           gitignorePath,
-          content + `\n# NodeCGC\n${gitignoreRule}\n`,
+          content + `\n# CodeCGC\n${gitignoreRule}\n`,
           "utf-8"
         );
-        created.push(".gitignore (追加 NodeCGC 规则)");
+        created.push(".gitignore (追加 CodeCGC 规则)");
       } else {
         skipped.push(".gitignore (已包含规则)");
       }
+    }
+
+    // 6. 释放项目级 skills 到 .claude/skills/<name>/SKILL.md
+    const skillsReleased = await releaseProjectSkills(projectRoot, force);
+    if (skillsReleased.length > 0) {
+      created.push(`.claude/skills/ (${skillsReleased.length} skills)`);
     }
 
     const totalCreated = created.length;
@@ -144,6 +157,35 @@ function getDefaultMcpConfig() {
       },
     },
   };
+}
+
+/**
+ * 从包的 skills/ 目录读取非全局 skill，写入项目 .claude/skills/<name>/SKILL.md
+ */
+async function releaseProjectSkills(projectRoot: string, force: boolean): Promise<string[]> {
+  // 从编译后位置回溯到包根: dist/mcp/codecgcmcp/tools/ → 包根/skills/
+  const skillsSourceDir = join(__dirname, "..", "..", "..", "..", "skills");
+  if (!existsSync(skillsSourceDir)) return [];
+
+  const files = readdirSync(skillsSourceDir).filter(f => f.endsWith(".md"));
+  const released: string[] = [];
+
+  for (const file of files) {
+    const name = file.replace(/\.md$/, "");
+    if (GLOBAL_ONLY_SKILLS.includes(name)) continue;
+
+    const destDir = join(projectRoot, ".claude", "skills", name);
+    const destFile = join(destDir, "SKILL.md");
+
+    if (existsSync(destFile) && !force) continue;
+
+    await ensureDir(destDir);
+    const content = await readFile(join(skillsSourceDir, file), "utf-8");
+    await writeFile(destFile, content, "utf-8");
+    released.push(name);
+  }
+
+  return released;
 }
 
 function getDefaultClaudeMd(): string {

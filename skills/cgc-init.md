@@ -5,7 +5,7 @@ description: 初始化当前项目的 CodeCGC 工作流环境
 
 在当前项目中初始化 CodeCGC。调用 MCP 工具 `codecgc.init` 完成以下操作：
 
-1. 创建 `codecgc/` 目录结构（features、issues、execution 等）
+1. 创建 `.codecgc/` 目录结构（features、issues、execution 等）
 2. 生成 `model-routing.yaml`（路径归属策略）
 3. 生成 `.claude/CLAUDE.md`（AI 提示词）
 4. 生成 `.mcp.json`（MCP 服务器配置）

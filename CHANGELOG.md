@@ -2,6 +2,27 @@
 
 All notable changes to CodeCGC will be documented in this file.
 
+## [1.0.1] - 2026-05-24
+
+### 🐛 Fixes
+
+#### `/cgc-init` skill 不被 Claude Code 识别
+- **问题**：postinstall 把 skill 释放为扁平 `.md` 文件，Claude Code 要求目录结构 `<name>/SKILL.md`
+- **修复**：`scripts/postinstall.cjs` 全局只释放 `cgc` + `cgc-init` 到 `~/.claude/skills/<name>/SKILL.md`，并清理旧扁平文件
+
+#### 终端 `cgc-init` 命令不存在
+- **问题**：`package.json` bin 未注册 `cgc-init`
+- **修复**：新增 `bin/cgc-init.js` 入口（代理到 `cgc init`），在 bin 字段声明
+
+#### 项目级 skills 自动释放
+- **新增**：`codecgc.init` 执行时把 `cgc-entry`、`cgc-plan` 等其余 skill 释放到项目 `.claude/skills/<name>/SKILL.md`
+- **影响**：全局只放 2 个入口 skill，初始化后项目内才看到完整命令集
+
+### 📝 Docs
+- README、`skills/cgc.md`、`skills/cgc-init.md`、`skills/cgc-doctor.md` 中 `codecgc/` → `.codecgc/`，与代码实际行为对齐
+
+---
+
 ## [0.4.5] - 2026-05-24
 
 ### 🔒 Hardening

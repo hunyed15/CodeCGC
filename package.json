@@ -1,6 +1,6 @@
 {
   "name": "@hunyed15/codecgc",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CodeCGC — multi-model workflow orchestration for AI-assisted development",
   "type": "module",
   "license": "MIT",
@@ -17,6 +17,7 @@
   ],
   "bin": {
     "cgc": "bin/cgc.js",
+    "cgc-init": "bin/cgc-init.js",
     "cgc-mcp": "bin/cgc-mcp.js",
     "gemini-http-service": "bin/gemini-http-service.cjs"
   },

@@ -13,7 +13,7 @@ codecgc.doctor({ cd: process.cwd() })
 - Node.js 版本（>= 20）
 - Codex CLI 可用性
 - Gemini CLI 可用性
-- `codecgc/` 目录结构
+- `.codecgc/` 目录结构
 - `model-routing.yaml` 配置
 - `.mcp.json` MCP 服务器配置
 

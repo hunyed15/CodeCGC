@@ -49,7 +49,7 @@ cgc "实现用户登录功能"
 
 ```
 your-project/
-├── codecgc/
+├── .codecgc/
 │   ├── features/             # feature workflow 产物
 │   ├── issues/               # issue workflow 产物
 │   ├── execution/            # 执行审计记录
