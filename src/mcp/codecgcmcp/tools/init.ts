@@ -181,9 +181,17 @@ function getDefaultRouting() {
 function getDefaultMcpConfig() {
   return {
     mcpServers: {
-      codecgcmcp: {
+      codecgc: {
         command: "cgc-mcp",
-        args: [],
+        args: ["codecgcmcp"],
+      },
+      codex: {
+        command: "cgc-mcp",
+        args: ["codexmcp"],
+      },
+      gemini: {
+        command: "cgc-mcp",
+        args: ["geminimcp"],
       },
     },
   };
