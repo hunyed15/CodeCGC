@@ -22,7 +22,7 @@
     "gemini-http-service": "bin/gemini-http-service.cjs"
   },
   "scripts": {
-    "build": "tsc && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/cli-worker.cjs','dist/mcp/codecgcmcp/runtime/cli-worker.cjs')\" && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/gemini-worker-thread.cjs','dist/mcp/codecgcmcp/runtime/gemini-worker-thread.cjs')\" && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/gemini-http-service.cjs','dist/mcp/codecgcmcp/runtime/gemini-http-service.cjs')\"",
+    "build": "tsc && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/cli-worker.cjs','dist/mcp/codecgcmcp/runtime/cli-worker.cjs')\" && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/gemini-worker-thread.cjs','dist/mcp/codecgcmcp/runtime/gemini-worker-thread.cjs')\" && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/cli-http-service.cjs','dist/mcp/codecgcmcp/runtime/cli-http-service.cjs')\" && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/gemini-http-service.cjs','dist/mcp/codecgcmcp/runtime/gemini-http-service.cjs')\"",
     "dev": "tsx watch src/mcp/codexmcp/server.ts",
     "test": "vitest",
     "prepublishOnly": "npm run build",

@@ -5,6 +5,9 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import { spawn } from "child_process";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import { entry, type EntryArgs } from "./tools/entry.js";
 import { plan, type PlanArgs } from "./tools/plan.js";
 import { build, type BuildArgs } from "./tools/build.js";
@@ -20,6 +23,9 @@ import { doctor, type DoctorArgs } from "./tools/doctor.js";
 import { continueExecution, type ContinueArgs } from "./tools/continue.js";
 import { audit, type AuditArgs } from "./tools/audit.js";
 import { manual, type ManualArgs } from "./tools/manual.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const TOOLS: Tool[] = [
   {
@@ -393,7 +399,35 @@ function validateInputSize(args: Record<string, unknown>): void {
   }
 }
 
+/**
+ * 启动 CLI HTTP 服务（后台进程）
+ */
+function startCliHttpService(): void {
+  const HTTP_PORT = 37428;
+  const servicePath = join(__dirname, "runtime", "cli-http-service.cjs");
+
+  // 检查服务是否已经在运行
+  fetch(`http://127.0.0.1:${HTTP_PORT}/health`)
+    .then(() => {
+      console.error(`[codecgcmcp] CLI HTTP service already running on port ${HTTP_PORT}`);
+    })
+    .catch(() => {
+      // 服务未运行，启动它
+      console.error(`[codecgcmcp] Starting CLI HTTP service on port ${HTTP_PORT}...`);
+      const proc = spawn("node", [servicePath, String(HTTP_PORT)], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      proc.unref(); // 让子进程独立运行，不阻塞父进程退出
+      console.error(`[codecgcmcp] CLI HTTP service started (PID: ${proc.pid})`);
+    });
+}
+
 async function main() {
+  // 启动 CLI HTTP 服务
+  startCliHttpService();
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("codecgcmcp MCP server running on stdio");
