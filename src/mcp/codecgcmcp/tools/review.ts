@@ -130,15 +130,49 @@ const RISK_CATEGORIES = [
 ];
 
 export async function review(args: ReviewArgs): Promise<ReviewRequest | ReviewResult> {
-  const projectRoot = resolveProjectRoot(args.cd);
-  const workflow = await readWorkflow(projectRoot, args.kind, args.slug);
-  const workflowDir = resolveWorkflowDir(projectRoot, workflow.kind, workflow.slug);
-  const routing = await readRouting(projectRoot);
+  try {
+    // Input validation
+    if (!args.kind || !args.slug) {
+      throw new Error("kind and slug are required");
+    }
 
-  const step = findStep(workflow, args.step_id);
-  if (!step) {
-    throw new Error(`步骤不存在: ${args.step_id}`);
-  }
+    if (!args.step_id || typeof args.step_id !== "string") {
+      throw new Error("step_id is required and must be a string");
+    }
+
+    if (args.max_file_size_kb !== undefined) {
+      if (typeof args.max_file_size_kb !== "number" || args.max_file_size_kb <= 0 || args.max_file_size_kb > 10240) {
+        throw new Error("max_file_size_kb must be between 1 and 10240");
+      }
+    }
+
+    if (args.issues && Array.isArray(args.issues)) {
+      if (args.issues.length > 100) {
+        throw new Error("issues array too large (max 100)");
+      }
+    }
+
+    if (args.suggestions && Array.isArray(args.suggestions)) {
+      if (args.suggestions.length > 50) {
+        throw new Error("suggestions array too large (max 50)");
+      }
+    }
+
+    if (args.acceptance_check && Array.isArray(args.acceptance_check)) {
+      if (args.acceptance_check.length > 50) {
+        throw new Error("acceptance_check array too large (max 50)");
+      }
+    }
+
+    const projectRoot = resolveProjectRoot(args.cd);
+    const workflow = await readWorkflow(projectRoot, args.kind, args.slug);
+    const workflowDir = resolveWorkflowDir(projectRoot, workflow.kind, workflow.slug);
+    const routing = await readRouting(projectRoot);
+
+    const step = findStep(workflow, args.step_id);
+    if (!step) {
+      throw new Error(`步骤不存在: ${args.step_id}`);
+    }
 
   if (step.status !== "pending" && step.status !== "skipped") {
     throw new Error(`步骤 ${args.step_id} 状态为 ${step.status}，只能审核 pending 或 skipped 状态的步骤`);
@@ -241,18 +275,32 @@ export async function review(args: ReviewArgs): Promise<ReviewRequest | ReviewRe
     issues_summary: issuesSummary,
   });
 
-  return {
-    mode: "decision",
-    success: true,
-    kind: workflow.kind,
-    slug: workflow.slug,
-    step_id: args.step_id,
-    decision: args.decision,
-    audit_count: auditFiles.length,
-    policy_check_summary: policyChecks,
-    issues_summary: issuesSummary,
-    next_action: nextAction,
-  };
+    return {
+      mode: "decision",
+      success: true,
+      kind: workflow.kind,
+      slug: workflow.slug,
+      step_id: args.step_id,
+      decision: args.decision,
+      audit_count: auditFiles.length,
+      policy_check_summary: policyChecks,
+      issues_summary: issuesSummary,
+      next_action: nextAction,
+    };
+  } catch (error) {
+    return {
+      mode: "decision",
+      success: false,
+      kind: args.kind,
+      slug: args.slug,
+      step_id: args.step_id,
+      decision: args.decision || "approved",
+      audit_count: 0,
+      policy_check_summary: [],
+      next_action: "",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 async function preparePackage(opts: {

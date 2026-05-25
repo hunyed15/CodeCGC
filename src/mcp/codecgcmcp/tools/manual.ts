@@ -45,6 +45,25 @@ export interface ManualResult {
  */
 export async function manual(args: ManualArgs): Promise<ManualResult> {
   try {
+    // Input validation
+    if (!args.kind || !args.slug) {
+      throw new Error("kind and slug are required");
+    }
+    if (!args.step_id || typeof args.step_id !== "string") {
+      throw new Error("step_id is required and must be a string");
+    }
+    if (!args.summary || typeof args.summary !== "string") {
+      throw new Error("summary is required and must be a string");
+    }
+    if (args.summary.length > 5000) {
+      throw new Error("summary too long (max 5000 characters)");
+    }
+    if (args.changed_files && Array.isArray(args.changed_files)) {
+      if (args.changed_files.length > 100) {
+        throw new Error("changed_files array too large (max 100)");
+      }
+    }
+
     const projectRoot = resolveProjectRoot(args.cd);
     const workflow = await readWorkflow(projectRoot, args.kind, args.slug);
     const step = findStep(workflow, args.step_id);

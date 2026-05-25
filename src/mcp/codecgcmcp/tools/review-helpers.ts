@@ -46,20 +46,30 @@ export async function readFilesForReview(
 
     try {
       const stats = await stat(absPath);
-      if (stats.size > maxBytes) {
-        const content = await readFile(absPath, "utf-8");
-        results.push({
-          path: p,
-          content: content.slice(0, maxBytes) + `\n\n[... truncated, total ${stats.size} bytes ...]`,
-          size_bytes: stats.size,
-          truncated: true,
-        });
+      const sizeBytes = stats.size;
+
+      // 如果文件超过限制，只读取前 maxBytes
+      if (sizeBytes > maxBytes) {
+        const buffer = Buffer.alloc(maxBytes);
+        const fd = await import("fs/promises").then(m => m.open(absPath, "r"));
+        try {
+          await fd.read(buffer, 0, maxBytes, 0);
+          const content = buffer.toString("utf-8");
+          results.push({
+            path: p,
+            content: content + `\n\n[... truncated, total ${sizeBytes} bytes ...]`,
+            size_bytes: sizeBytes,
+            truncated: true,
+          });
+        } finally {
+          await fd.close();
+        }
       } else {
         const content = await readFile(absPath, "utf-8");
         results.push({
           path: p,
           content,
-          size_bytes: stats.size,
+          size_bytes: sizeBytes,
           truncated: false,
         });
       }

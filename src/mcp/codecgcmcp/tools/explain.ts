@@ -43,6 +43,11 @@ export interface ExplainResult {
  */
 export async function explain(args: ExplainArgs): Promise<ExplainResult> {
   try {
+    // Input validation
+    if (!args.kind || !args.slug) {
+      throw new Error("kind and slug are required");
+    }
+
     const projectRoot = resolveProjectRoot(args.cd);
     const workflow = await readWorkflow(projectRoot, args.kind, args.slug);
     const state = await inferWorkflowState(projectRoot, workflow);

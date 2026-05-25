@@ -57,6 +57,13 @@ export interface HistoryResult {
  */
 export async function history(args: HistoryArgs): Promise<HistoryResult> {
   try {
+    // Input validation
+    if (args.limit !== undefined) {
+      if (typeof args.limit !== "number" || args.limit < 1 || args.limit > 1000) {
+        throw new Error("limit must be between 1 and 1000");
+      }
+    }
+
     const projectRoot = resolveProjectRoot(args.cd);
 
     // 模式 1：查询单个 workflow

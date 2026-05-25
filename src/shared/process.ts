@@ -56,7 +56,10 @@ export function readlines(stream: Readable): AsyncIterable<string> {
 /**
  * 安全 JSON 解析，解析失败返回 null
  */
+const MAX_JSON_LINE_BYTES = 1_048_576; // 1 MB
+
 export function tryParseJson(line: string): Record<string, unknown> | null {
+  if (line.length > MAX_JSON_LINE_BYTES) return null;
   try {
     const parsed = JSON.parse(line.trim());
     if (typeof parsed === "object" && parsed !== null) {
@@ -79,7 +82,7 @@ export function wait(ms: number): Promise<void> {
  * 终止进程树（Windows 用 taskkill，Unix 用 SIGTERM）
  */
 export function killProcessTree(pid: number | undefined): void {
-  if (!pid) return;
+  if (!pid || pid <= 0 || !Number.isInteger(pid)) return;
   try {
     if (process.platform === "win32") {
       execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });

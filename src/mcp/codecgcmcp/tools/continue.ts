@@ -49,6 +49,22 @@ export interface ContinueResult {
  */
 export async function continueExecution(args: ContinueArgs): Promise<ContinueResult> {
   try {
+    // Input validation
+    if (!args.kind || !args.slug) {
+      throw new Error("kind and slug are required");
+    }
+    if (!args.step_id || typeof args.step_id !== "string") {
+      throw new Error("step_id is required and must be a string");
+    }
+    if (!args.session_id || typeof args.session_id !== "string") {
+      throw new Error("session_id is required and must be a string");
+    }
+    if (args.timeout_seconds !== undefined) {
+      if (typeof args.timeout_seconds !== "number" || args.timeout_seconds <= 0 || args.timeout_seconds > 3600) {
+        throw new Error("timeout_seconds must be between 1 and 3600");
+      }
+    }
+
     const projectRoot = resolveProjectRoot(args.cd);
     const workflow = await readWorkflow(projectRoot, args.kind, args.slug);
     const step = findStep(workflow, args.step_id);

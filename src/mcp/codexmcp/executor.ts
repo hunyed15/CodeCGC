@@ -8,9 +8,24 @@ const DEFAULT_TIMEOUT_MS = 600_000; // 10 分钟
  * 执行 Codex CLI 会话
  */
 export async function runCodexSession(opts: CodexOptions): Promise<ExecutorResult> {
+  // Input validation
+  if (!opts.prompt || typeof opts.prompt !== "string") {
+    throw new Error("prompt is required and must be a string");
+  }
+  if (opts.prompt.length > 50000) {
+    throw new Error("prompt too long (max 50000 characters)");
+  }
+  if (!opts.cd || typeof opts.cd !== "string") {
+    throw new Error("cd is required and must be a string");
+  }
+
   const cmd = await resolveCliCommand("codex");
   const args = buildCodexArgs(opts);
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  if (typeof timeoutMs !== "number" || timeoutMs <= 0 || timeoutMs > 3600_000) {
+    throw new Error("timeoutMs must be between 1 and 3600000 (1 hour)");
+  }
 
   const proc = spawn(cmd[0], [...cmd.slice(1), ...args], {
     cwd: opts.cd,

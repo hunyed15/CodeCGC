@@ -56,17 +56,21 @@ export async function readWorkflow(
   kind: WorkflowKind,
   slug: string
 ): Promise<Workflow> {
-  const dir = resolveWorkflowDir(projectRoot, kind, slug);
-  const file = workflowFile(dir);
-  if (!existsSync(file)) {
-    throw new Error(`Workflow 不存在: ${file}`);
+  try {
+    const dir = resolveWorkflowDir(projectRoot, kind, slug);
+    const file = workflowFile(dir);
+    if (!existsSync(file)) {
+      throw new Error(`Workflow 不存在: ${file}`);
+    }
+    const wf = await readYaml<Workflow>(file);
+    if (!wf || typeof wf !== "object") {
+      throw new Error(`无效的 workflow.yaml: ${file}`);
+    }
+    if (!Array.isArray(wf.steps)) wf.steps = [];
+    return wf;
+  } catch (error) {
+    throw new Error(`读取 workflow 失败: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const wf = await readYaml<Workflow>(file);
-  if (!wf || typeof wf !== "object") {
-    throw new Error(`无效的 workflow.yaml: ${file}`);
-  }
-  if (!Array.isArray(wf.steps)) wf.steps = [];
-  return wf;
 }
 
 /**
@@ -76,14 +80,24 @@ export async function writeWorkflow(
   projectRoot: string,
   workflow: Workflow
 ): Promise<string> {
-  const dir = resolveWorkflowDir(projectRoot, workflow.kind, workflow.slug);
-  await ensureDir(dir);
-  await ensureDir(auditDir(dir));
-  const file = workflowFile(dir);
-  await withFileLock(file, async () => {
-    await writeYaml(file, workflow);
-  });
-  return file;
+  try {
+    if (!workflow || typeof workflow !== "object") {
+      throw new Error("workflow must be a valid object");
+    }
+    if (!workflow.kind || !workflow.slug) {
+      throw new Error("workflow.kind and workflow.slug are required");
+    }
+    const dir = resolveWorkflowDir(projectRoot, workflow.kind, workflow.slug);
+    await ensureDir(dir);
+    await ensureDir(auditDir(dir));
+    const file = workflowFile(dir);
+    await withFileLock(file, async () => {
+      await writeYaml(file, workflow);
+    });
+    return file;
+  } catch (error) {
+    throw new Error(`写入 workflow 失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**
@@ -193,26 +207,58 @@ export async function writeAudit(
   stepId: string,
   data: Record<string, unknown>
 ): Promise<string> {
-  const dir = auditDir(workflowDir);
-  await ensureDir(dir);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const rand = randomBytes(3).toString("hex");
-  const file = join(dir, `${stepId}-${timestamp}-${rand}.json`);
-  await writeFile(file, JSON.stringify(data, null, 2), "utf-8");
-  return file;
+  try {
+    if (!stepId || typeof stepId !== "string") {
+      throw new Error("stepId is required and must be a string");
+    }
+    if (stepId.length > 100) {
+      throw new Error("stepId too long (max 100 characters)");
+    }
+    if (!data || typeof data !== "object") {
+      throw new Error("data must be a valid object");
+    }
+
+    // Validate data size (prevent DoS)
+    const jsonStr = JSON.stringify(data, null, 2);
+    const sizeKb = Buffer.byteLength(jsonStr, "utf-8") / 1024;
+    if (sizeKb > 10240) {
+      throw new Error(`audit data too large (${sizeKb.toFixed(0)}KB, max 10MB)`);
+    }
+
+    const dir = auditDir(workflowDir);
+    await ensureDir(dir);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const rand = randomBytes(3).toString("hex");
+    const file = join(dir, `${stepId}-${timestamp}-${rand}.json`);
+    await writeFile(file, jsonStr, "utf-8");
+    return file;
+  } catch (error) {
+    throw new Error(`写入 audit 失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**
  * 列出某个 step 的所有 audit
  */
 export async function listAudits(workflowDir: string, stepId?: string): Promise<string[]> {
-  const dir = auditDir(workflowDir);
-  if (!existsSync(dir)) return [];
-  const entries = await readdir(dir);
-  return entries
-    .filter((f) => f.endsWith(".json"))
-    .filter((f) => !stepId || f.startsWith(`${stepId}-`))
-    .map((f) => join(dir, f));
+  try {
+    const dir = auditDir(workflowDir);
+    if (!existsSync(dir)) return [];
+    const entries = await readdir(dir);
+    const filtered = entries
+      .filter((f) => f.endsWith(".json"))
+      .filter((f) => !stepId || f.startsWith(`${stepId}-`))
+      .map((f) => join(dir, f));
+
+    // Limit result size (prevent DoS)
+    if (filtered.length > 1000) {
+      throw new Error(`Too many audit files (${filtered.length}, max 1000)`);
+    }
+
+    return filtered;
+  } catch (error) {
+    throw new Error(`列出 audit 失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**

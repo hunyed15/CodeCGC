@@ -29,6 +29,35 @@ export async function executeBackendTask(opts: BackendTaskOptions): Promise<Task
   const policyChecks: string[] = [];
   const risks: string[] = [];
 
+  // Input validation
+  if (!opts.taskId || typeof opts.taskId !== "string") {
+    return {
+      success: false,
+      taskId: opts.taskId || "",
+      sessionId: "",
+      summary: "task_id is required and must be a string",
+      agentMessages: "",
+      changedFiles: [],
+      policyChecks,
+      risks,
+      error: "task_id is required and must be a string",
+    };
+  }
+
+  if (!opts.taskSummary || typeof opts.taskSummary !== "string") {
+    return {
+      success: false,
+      taskId: opts.taskId,
+      sessionId: "",
+      summary: "task_summary is required and must be a string",
+      agentMessages: "",
+      changedFiles: [],
+      policyChecks,
+      risks,
+      error: "task_summary is required and must be a string",
+    };
+  }
+
   // 1. 路径非空校验
   if (!opts.targetPaths || opts.targetPaths.length === 0) {
     return {
@@ -43,6 +72,21 @@ export async function executeBackendTask(opts: BackendTaskOptions): Promise<Task
       error: "target_paths 不能为空",
     };
   }
+
+  if (opts.targetPaths.length > 100) {
+    return {
+      success: false,
+      taskId: opts.taskId,
+      sessionId: "",
+      summary: "target_paths array too large (max 100)",
+      agentMessages: "",
+      changedFiles: [],
+      policyChecks,
+      risks,
+      error: "target_paths array too large (max 100)",
+    };
+  }
+
   policyChecks.push("target_paths_present");
   policyChecks.push("backend_scope_requested");
 

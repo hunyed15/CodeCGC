@@ -67,6 +67,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     if (name === "gemini") {
+      // Input validation
+      const timeoutSeconds = (args.timeout_seconds as number) || 600;
+      if (typeof timeoutSeconds !== "number" || timeoutSeconds <= 0 || timeoutSeconds > 3600) {
+        throw new Error("timeout_seconds must be between 1 and 3600");
+      }
+
       const opts: GeminiOptions = {
         prompt: args.PROMPT as string,
         cd: args.cd as string,
@@ -74,7 +80,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         sessionId: args.SESSION_ID as string | undefined,
         returnAllMessages: args.return_all_messages as boolean,
         model: args.model as string | undefined,
-        timeoutMs: ((args.timeout_seconds as number) || 600) * 1000,
+        timeoutMs: timeoutSeconds * 1000,
       };
       const result = await runGeminiSession(opts);
       return {
@@ -94,6 +100,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (name === "implement_frontend_task") {
+      // Input validation
+      const timeoutSeconds = (args.timeout_seconds as number) || 600;
+      if (typeof timeoutSeconds !== "number" || timeoutSeconds <= 0 || timeoutSeconds > 3600) {
+        throw new Error("timeout_seconds must be between 1 and 3600");
+      }
+
       const opts: FrontendTaskOptions = {
         taskId: args.task_id as string,
         taskSummary: args.task_summary as string,
@@ -105,7 +117,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         sandbox: args.sandbox as boolean,
         returnAllMessages: args.return_all_messages as boolean,
         model: args.model as string | undefined,
-        timeoutMs: ((args.timeout_seconds as number) || 600) * 1000,
+        timeoutMs: timeoutSeconds * 1000,
       };
       const result = await executeFrontendTask(opts);
       return {

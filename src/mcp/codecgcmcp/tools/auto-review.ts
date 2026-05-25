@@ -32,7 +32,14 @@ export async function autoCollectReviewContext(opts: {
   latestAuditFile: string;
   maxFileSizeKb?: number;
 }): Promise<ReviewRequest | null> {
-  const { projectRoot, kind, slug, stepId, latestAuditFile, maxFileSizeKb = 200 } = opts;
+  const { projectRoot, kind, slug, stepId, latestAuditFile } = opts;
+
+  // Input validation
+  let maxFileSizeKb = opts.maxFileSizeKb ?? 200;
+  if (typeof maxFileSizeKb !== "number" || maxFileSizeKb <= 0 || maxFileSizeKb > 10240) {
+    console.warn(`[autoCollectReviewContext] Invalid maxFileSizeKb: ${maxFileSizeKb}, using default 200`);
+    maxFileSizeKb = 200;
+  }
 
   try {
     const workflow = await readWorkflow(projectRoot, kind, slug);

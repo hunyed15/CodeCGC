@@ -6,7 +6,7 @@ import { existsSync, readFileSync, unlinkSync } from "fs";
 import { randomBytes } from "crypto";
 import { tmpdir } from "os";
 import type { StepExecutor, WorkflowStep } from "../../../shared/types.js";
-import { resolveCliCommand } from "../../../shared/process.js";
+import { resolveCliCommand, tryParseJson } from "../../../shared/process.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -126,6 +126,16 @@ async function runGeminiViaHttp(opts: {
   timeoutMs: number;
 }): Promise<{ success: boolean; sessionId: string; agentMessages: string; error?: string }> {
   const HTTP_SERVICE_URL = process.env.GEMINI_HTTP_SERVICE_URL || "http://127.0.0.1:37428";
+
+  // URL 白名单：只允许 localhost
+  try {
+    const url = new URL(HTTP_SERVICE_URL);
+    if (url.hostname !== "127.0.0.1" && url.hostname !== "localhost" && url.hostname !== "::1") {
+      return { success: false, sessionId: "", agentMessages: "", error: `不允许的 HTTP 服务地址: ${url.hostname}` };
+    }
+  } catch (e) {
+    return { success: false, sessionId: "", agentMessages: "", error: `无效的 HTTP 服务 URL: ${HTTP_SERVICE_URL}` };
+  }
 
   try {
     console.error(`[runGeminiViaHttp] Calling ${HTTP_SERVICE_URL}/execute`);
@@ -275,14 +285,6 @@ async function runGeminiDirectly(opts: {
       res({ success: false, sessionId: "", agentMessages: "", error: `执行超时（${opts.timeoutMs}ms）` });
     }, opts.timeoutMs);
 
-    function tryParseJson(line: string) {
-      try {
-        const parsed = JSON.parse(line.trim());
-        if (typeof parsed === "object" && parsed !== null) return parsed;
-        return null;
-      } catch { return null; }
-    }
-
     proc.stdout.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();
       const lines = buffer.split("\n");
@@ -300,8 +302,11 @@ async function runGeminiDirectly(opts: {
         if (event.type === "message" && event.role === "assistant" && typeof event.content === "string") {
           agentMessages += event.content;
         }
-        if (event.item && event.item.type === "agent_message" && typeof event.item.text === "string") {
-          agentMessages += event.item.text;
+        if (event.item && typeof event.item === "object" && event.item !== null) {
+          const item = event.item as Record<string, unknown>;
+          if (item.type === "agent_message" && typeof item.text === "string") {
+            agentMessages += item.text;
+          }
         }
         if (event.type === "error" && typeof event.message === "string") {
           if (!/^Reconnecting\.\.\.\s+\d+\/\d+/.test(event.message)) {
@@ -424,6 +429,23 @@ export async function callFrontendExecutor(
 }
 
 function buildBackendPrompt(step: WorkflowStep): string {
+  const MAX_FIELD_LENGTH = 10000;
+  const MAX_ARRAY_LENGTH = 200;
+
+  // 验证字段长度
+  if (step.summary.length > MAX_FIELD_LENGTH) {
+    throw new Error(`step.summary 超过最大长度 ${MAX_FIELD_LENGTH} 字符`);
+  }
+  if (step.paths.length > MAX_ARRAY_LENGTH) {
+    throw new Error(`step.paths 超过最大数组长度 ${MAX_ARRAY_LENGTH}`);
+  }
+  if (step.constraints && step.constraints.length > MAX_ARRAY_LENGTH) {
+    throw new Error(`step.constraints 超过最大数组长度 ${MAX_ARRAY_LENGTH}`);
+  }
+  if (step.acceptance && step.acceptance.length > MAX_ARRAY_LENGTH) {
+    throw new Error(`step.acceptance 超过最大数组长度 ${MAX_ARRAY_LENGTH}`);
+  }
+
   const lines: string[] = [
     `任务 ID：${step.task_id}`,
     ``,
@@ -445,6 +467,23 @@ function buildBackendPrompt(step: WorkflowStep): string {
 }
 
 function buildFrontendPrompt(step: WorkflowStep): string {
+  const MAX_FIELD_LENGTH = 10000;
+  const MAX_ARRAY_LENGTH = 200;
+
+  // 验证字段长度
+  if (step.summary.length > MAX_FIELD_LENGTH) {
+    throw new Error(`step.summary 超过最大长度 ${MAX_FIELD_LENGTH} 字符`);
+  }
+  if (step.paths.length > MAX_ARRAY_LENGTH) {
+    throw new Error(`step.paths 超过最大数组长度 ${MAX_ARRAY_LENGTH}`);
+  }
+  if (step.constraints && step.constraints.length > MAX_ARRAY_LENGTH) {
+    throw new Error(`step.constraints 超过最大数组长度 ${MAX_ARRAY_LENGTH}`);
+  }
+  if (step.acceptance && step.acceptance.length > MAX_ARRAY_LENGTH) {
+    throw new Error(`step.acceptance 超过最大数组长度 ${MAX_ARRAY_LENGTH}`);
+  }
+
   const lines: string[] = [
     `任务 ID：${step.task_id}`,
     ``,
@@ -473,6 +512,17 @@ export async function callExecutor(
   projectRoot: string,
   timeoutMs = 900_000
 ): Promise<ExecutorCallResult> {
+  // Input validation
+  if (!step || typeof step !== "object") {
+    throw new Error("step is required and must be an object");
+  }
+  if (!projectRoot || typeof projectRoot !== "string") {
+    throw new Error("projectRoot is required and must be a string");
+  }
+  if (typeof timeoutMs !== "number" || timeoutMs <= 0 || timeoutMs > 3600_000) {
+    throw new Error("timeoutMs must be between 1 and 3600000 (1 hour)");
+  }
+
   if (step.executor === "backend") {
     return callBackendExecutor(step, projectRoot, timeoutMs);
   }

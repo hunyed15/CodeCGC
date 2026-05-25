@@ -57,6 +57,13 @@ export interface AuditResult {
  */
 export async function audit(args: AuditArgs): Promise<AuditResult> {
   try {
+    // Input validation
+    if (args.stale_days !== undefined) {
+      if (typeof args.stale_days !== "number" || args.stale_days < 1 || args.stale_days > 365) {
+        throw new Error("stale_days must be between 1 and 365");
+      }
+    }
+
     const projectRoot = resolveProjectRoot(args.cd);
     const check = args.check ?? "all";
     const staleDays = args.stale_days ?? 7;

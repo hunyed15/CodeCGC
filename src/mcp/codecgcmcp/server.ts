@@ -381,25 +381,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 /**
- * 输入大小防护：防止超长输入导致 DoS
+ * 输入大小防护：防止超长输入导致 DoS（递归检查嵌套对象）
  */
-function validateInputSize(args: Record<string, unknown>): void {
+function validateInputSize(args: Record<string, unknown>, path = ""): void {
   const MAX_STRING = 5000;
   const MAX_ARRAY = 100;
+  const MAX_DEPTH = 10;
+
+  if (path.split(".").length > MAX_DEPTH) {
+    throw new Error(`参数嵌套深度超过 ${MAX_DEPTH} 层`);
+  }
 
   for (const [key, value] of Object.entries(args)) {
-    if (typeof value === "string" && value.length > MAX_STRING) {
-      throw new Error(`参数 ${key} 超过最大长度 ${MAX_STRING} 字符`);
-    }
-    if (Array.isArray(value)) {
-      if (value.length > MAX_ARRAY) {
-        throw new Error(`参数 ${key} 超过最大数组长度 ${MAX_ARRAY}`);
+    const fullPath = path ? `${path}.${key}` : key;
+
+    if (typeof value === "string") {
+      if (value.length > MAX_STRING) {
+        throw new Error(`参数 ${fullPath} 超过最大长度 ${MAX_STRING} 字符`);
       }
-      for (const item of value) {
+    } else if (Array.isArray(value)) {
+      if (value.length > MAX_ARRAY) {
+        throw new Error(`参数 ${fullPath} 超过最大数组长度 ${MAX_ARRAY}`);
+      }
+      for (let i = 0; i < value.length; i++) {
+        const item = value[i];
         if (typeof item === "string" && item.length > MAX_STRING) {
-          throw new Error(`参数 ${key} 中的元素超过最大长度 ${MAX_STRING} 字符`);
+          throw new Error(`参数 ${fullPath}[${i}] 超过最大长度 ${MAX_STRING} 字符`);
+        }
+        if (typeof item === "object" && item !== null && !Array.isArray(item)) {
+          validateInputSize(item as Record<string, unknown>, `${fullPath}[${i}]`);
         }
       }
+    } else if (typeof value === "object" && value !== null) {
+      validateInputSize(value as Record<string, unknown>, fullPath);
     }
   }
 }
