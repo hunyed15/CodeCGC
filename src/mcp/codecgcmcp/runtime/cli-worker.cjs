@@ -42,6 +42,8 @@ async function main() {
   let timedOut = false;
   let buffer = "";
   let stderrBuffer = "";
+  let lastEventTime = Date.now();
+  let heartbeatWarned = false;
 
   const timeout = setTimeout(() => {
     timedOut = true;
@@ -55,8 +57,24 @@ async function main() {
     } catch {}
   }, opts.timeoutMs || 600000);
 
+  // 心跳检测（每 30 秒检查一次，2 分钟无事件 = 可疑）
+  const HEARTBEAT_INTERVAL = 30_000;  // 检查间隔 30 秒
+  const HEARTBEAT_THRESHOLD = 120_000; // 2 分钟无事件 = 可疑
+  const heartbeatCheck = setInterval(() => {
+    const elapsed = Date.now() - lastEventTime;
+    if (elapsed > HEARTBEAT_THRESHOLD && !heartbeatWarned) {
+      heartbeatWarned = true;
+      const warning = `[cli-worker] 警告：${Math.floor(elapsed / 1000)}秒 无 stdout 事件，CLI 可能卡死（PID=${proc.pid}）`;
+      console.error(warning);
+      writeFileSync(resultFile + ".heartbeat-warning", warning + " time=" + new Date().toISOString());
+    }
+  }, HEARTBEAT_INTERVAL);
+
   // 事件驱动读取 stdout（不阻塞事件循环）
   proc.stdout.on("data", (chunk) => {
+    lastEventTime = Date.now(); // 更新心跳时间
+    heartbeatWarned = false;    // 重置警告标志
+
     buffer += chunk.toString();
     const lines = buffer.split("\n");
     buffer = lines.pop() || ""; // 保留不完整的行
@@ -101,6 +119,7 @@ async function main() {
   });
 
   clearTimeout(timeout);
+  clearInterval(heartbeatCheck);
 
   const result = {
     success: timedOut ? false : (!!sessionId && !errorMessage),
