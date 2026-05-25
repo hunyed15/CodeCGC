@@ -30,6 +30,7 @@ export interface ExecutorCallResult {
  * 异步 spawn 不阻塞事件循环（保持 MCP 协议心跳），结果通过临时文件传递
  */
 async function runViaWorker(opts: {
+  cli?: "codex" | "gemini";
   cmd: string[];
   args: string[];
   cd: string;
@@ -42,6 +43,7 @@ async function runViaWorker(opts: {
 
   return new Promise((res) => {
     const child = spawn("node", [workerPath, JSON.stringify({
+      cli: opts.cli || "codex",
       cmd: opts.cmd[0],
       args: [...opts.cmd.slice(1), ...opts.args],
       cd: opts.cd,
@@ -452,7 +454,7 @@ export async function callBackendExecutor(
 }
 
 /**
- * 通过 fork worker 调用前端执行器（Gemini CLI）
+ * 通过 HTTP 服务调用前端执行器（Gemini CLI），HTTP 不可用时回退到 worker
  */
 export async function callFrontendExecutor(
   step: WorkflowStep,
@@ -472,15 +474,17 @@ export async function callFrontendExecutor(
   ];
   if (step.session_id) args.push("--resume", step.session_id);
 
-  const result = await runCliViaHttp({
-    cli: "gemini",
-    cmd,
-    args,
-    cd,
-    env: { GEMINI_CLI_TRUST_WORKSPACE: "true", NODE_OPTIONS: "" },
-    sessionId: step.session_id ?? "",
-    timeoutMs,
-  });
+  const env = { GEMINI_CLI_TRUST_WORKSPACE: "true", NODE_OPTIONS: "" };
+  const sessionId = step.session_id ?? "";
+
+  let result: { success: boolean; sessionId: string; agentMessages: string; error?: string };
+  if (await isHttpServiceAvailable()) {
+    console.error(`[callFrontendExecutor] HTTP service available, using HTTP path`);
+    result = await runCliViaHttp({ cli: "gemini", cmd, args, cd, env, sessionId, timeoutMs });
+  } else {
+    console.error(`[callFrontendExecutor] HTTP service unavailable, falling back to worker`);
+    result = await runViaWorker({ cli: "gemini", cmd, args, cd, env, sessionId, timeoutMs });
+  }
 
   return {
     success: result.success,

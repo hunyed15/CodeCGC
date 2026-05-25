@@ -36,9 +36,20 @@ function detectPhase(event) {
 }
 
 async function main() {
+  // Gemini CLI 需要显式的 null device stdin（不能用 "ignore"）
+  // "ignore" 可能导致 Gemini 检测 stdin 时卡住
+  let stdinFd = null;
+  let stdinOpt = "ignore";
+  if (opts.cli === "gemini") {
+    const { openSync } = require("fs");
+    const nullDevice = process.platform === "win32" ? "\\\\.\\nul" : "/dev/null";
+    stdinFd = openSync(nullDevice, "r");
+    stdinOpt = stdinFd;
+  }
+
   const proc = spawn(opts.cmd, opts.args, {
     cwd: opts.cd,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: [stdinOpt, "pipe", "pipe"],
     env: { ...process.env, ...opts.env },
     windowsHide: true,
   });
@@ -145,6 +156,9 @@ async function main() {
 
   clearTimeout(timeout);
   clearInterval(heartbeatCheck);
+  if (stdinFd !== null) {
+    try { require("fs").closeSync(stdinFd); } catch {}
+  }
 
   const result = {
     success: timedOut ? false : (!!sessionId && !errorMessage),
