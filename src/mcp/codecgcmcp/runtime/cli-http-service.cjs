@@ -147,7 +147,7 @@ function spawnCLI(opts) {
           process.kill(-proc.pid, "SIGTERM");
         }
       }
-    } catch
+    } catch {}
     sessions.set(requestId, {
       success: false,
       sessionId: "",
