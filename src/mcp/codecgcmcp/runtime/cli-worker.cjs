@@ -22,6 +22,19 @@ function tryParseJson(line) {
   } catch { return null; }
 }
 
+function detectPhase(event) {
+  if (!event || !event.type) return "unknown";
+  const type = event.type;
+  if (type === "turn.completed" || type === "result") return "completed";
+  if (type === "tool_use" && event.tool) {
+    const tool = (typeof event.tool === "string" ? event.tool : "").toLowerCase();
+    if (tool.includes("read") || tool.includes("grep") || tool.includes("glob") || tool.includes("search")) return "reading";
+    if (tool.includes("write") || tool.includes("edit") || tool.includes("create")) return "writing";
+  }
+  if (type === "message" && event.role === "assistant") return "thinking";
+  return "active";
+}
+
 async function main() {
   const proc = spawn(opts.cmd, opts.args, {
     cwd: opts.cd,
@@ -82,6 +95,18 @@ async function main() {
     for (const line of lines) {
       const event = tryParseJson(line);
       if (!event) continue;
+
+      // 写进度文件（供 runViaWorker 读取）
+      const phase = detectPhase(event);
+      try {
+        writeFileSync(resultFile + ".progress", JSON.stringify({
+          phase,
+          lastEventTime: Date.now(),
+          lastEventType: event.type || "unknown",
+          isAlive: true,
+        }));
+      } catch {}
+
       if (event.session_id && typeof event.session_id === "string") {
         sessionId = event.session_id;
       }

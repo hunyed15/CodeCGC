@@ -54,6 +54,7 @@ async function runViaWorker(opts: {
     });
 
     let resolved = false;
+    let lastProgressWarn = 0;
 
     const fallbackTimeout = setTimeout(() => {
       if (resolved) return;
@@ -77,6 +78,22 @@ async function runViaWorker(opts: {
           res({ success: false, sessionId: "", agentMessages: "", error: `结果解析失败: ${e}` });
         } finally {
           try { unlinkSync(resultFile); } catch {}
+          try { unlinkSync(resultFile + ".progress"); } catch {}
+        }
+      } else {
+        // 读取进度文件检测卡死（节流 60 秒）
+        const progressFile = resultFile + ".progress";
+        const now = Date.now();
+        if (now - lastProgressWarn > 60_000 && existsSync(progressFile)) {
+          try {
+            const raw = readFileSync(progressFile, "utf-8");
+            const progress = JSON.parse(raw);
+            const elapsed = now - progress.lastEventTime;
+            if (elapsed > 120_000) {
+              lastProgressWarn = now;
+              console.error(`[runViaWorker] ⚠️ CLI 可能卡死: phase=${progress.phase}, ${Math.floor(elapsed / 1000)}s 无事件`);
+            }
+          } catch {}
         }
       }
     }, 2000);
@@ -113,11 +130,38 @@ async function runViaWorker(opts: {
   });
 }
 
+function getHttpServiceUrl(): string | null {
+  const url = process.env.GEMINI_HTTP_SERVICE_URL || "http://127.0.0.1:37428";
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "127.0.0.1" && u.hostname !== "localhost" && u.hostname !== "::1") {
+      console.error(`[runCliViaHttp] 不允许的 HTTP 服务地址: ${u.hostname}`);
+      return null;
+    }
+    return url;
+  } catch {
+    console.error(`[runCliViaHttp] 无效的 HTTP 服务 URL: ${url}`);
+    return null;
+  }
+}
+
+async function isHttpServiceAvailable(): Promise<boolean> {
+  const url = getHttpServiceUrl();
+  if (!url) return false;
+  try {
+    const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(1000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * 通过独立 HTTP 服务调用 Gemini CLI
- * 绕过 MCP StdioServerTransport 的环境限制
+ * 通过独立 HTTP 服务调用 CLI（Gemini / Codex）
+ * 提交执行请求 → 轮询结果，期间定期查询进度
  */
-async function runGeminiViaHttp(opts: {
+async function runCliViaHttp(opts: {
+  cli: "gemini" | "codex";
   cmd: string[];
   args: string[];
   cd: string;
@@ -125,25 +169,18 @@ async function runGeminiViaHttp(opts: {
   sessionId: string;
   timeoutMs: number;
 }): Promise<{ success: boolean; sessionId: string; agentMessages: string; error?: string }> {
-  const HTTP_SERVICE_URL = process.env.GEMINI_HTTP_SERVICE_URL || "http://127.0.0.1:37428";
-
-  // URL 白名单：只允许 localhost
-  try {
-    const url = new URL(HTTP_SERVICE_URL);
-    if (url.hostname !== "127.0.0.1" && url.hostname !== "localhost" && url.hostname !== "::1") {
-      return { success: false, sessionId: "", agentMessages: "", error: `不允许的 HTTP 服务地址: ${url.hostname}` };
-    }
-  } catch (e) {
-    return { success: false, sessionId: "", agentMessages: "", error: `无效的 HTTP 服务 URL: ${HTTP_SERVICE_URL}` };
+  const HTTP_SERVICE_URL = getHttpServiceUrl();
+  if (!HTTP_SERVICE_URL) {
+    return { success: false, sessionId: "", agentMessages: "", error: "HTTP 服务 URL 不合法" };
   }
 
   try {
-    console.error(`[runGeminiViaHttp] Calling ${HTTP_SERVICE_URL}/execute`);
-    // 提交执行请求
+    console.error(`[runCliViaHttp:${opts.cli}] Calling ${HTTP_SERVICE_URL}/execute`);
     const executeRes = await fetch(`${HTTP_SERVICE_URL}/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        cli: opts.cli,
         cmd: opts.cmd[0],
         args: [...opts.cmd.slice(1), ...opts.args],
         cd: opts.cd,
@@ -158,24 +195,21 @@ async function runGeminiViaHttp(opts: {
     }
 
     const { requestId } = await executeRes.json() as { requestId: string };
-    console.error(`[runGeminiViaHttp] Got requestId: ${requestId}`);
+    console.error(`[runCliViaHttp:${opts.cli}] Got requestId: ${requestId}`);
 
-    // 轮询结果（每 2 秒）+ 心跳检测（每 60 秒检查进度）
     const startTime = Date.now();
     let lastProgressCheck = startTime;
-    const PROGRESS_CHECK_INTERVAL = 60_000; // 每 60 秒检查一次进度
+    const PROGRESS_CHECK_INTERVAL = 60_000;
 
     while (Date.now() - startTime < opts.timeoutMs + 10000) {
       await new Promise(r => setTimeout(r, 2000));
 
-      // 先尝试获取结果
       const resultRes = await fetch(`${HTTP_SERVICE_URL}/result/${requestId}`);
       if (resultRes.ok) {
-        console.error(`[runGeminiViaHttp] Got result after ${Date.now() - startTime}ms`);
+        console.error(`[runCliViaHttp:${opts.cli}] Got result after ${Date.now() - startTime}ms`);
         return await resultRes.json() as { success: boolean; sessionId: string; agentMessages: string; error?: string };
       }
 
-      // 定期检查进度（心跳探查）
       const now = Date.now();
       if (now - lastProgressCheck > PROGRESS_CHECK_INTERVAL) {
         lastProgressCheck = now;
@@ -189,23 +223,21 @@ async function runGeminiViaHttp(opts: {
               isStuck: boolean;
               elapsedSinceLastEvent: number;
             };
-            console.error(`[runGeminiViaHttp] Progress check: phase=${progress.phase}, isStuck=${progress.isStuck}, elapsed=${Math.floor(progress.elapsedSinceLastEvent / 1000)}s`);
-
-            // 如果检测到卡死，记录警告（但不中断，让超时机制处理）
+            console.error(`[runCliViaHttp:${opts.cli}] Progress: phase=${progress.phase}, isStuck=${progress.isStuck}, elapsed=${Math.floor(progress.elapsedSinceLastEvent / 1000)}s`);
             if (progress.isStuck) {
-              console.error(`[runGeminiViaHttp] ⚠️ CLI appears stuck (no events for ${Math.floor(progress.elapsedSinceLastEvent / 1000)}s)`);
+              console.error(`[runCliViaHttp:${opts.cli}] ⚠️ CLI appears stuck (no events for ${Math.floor(progress.elapsedSinceLastEvent / 1000)}s)`);
             }
           }
         } catch (e) {
-          console.error(`[runGeminiViaHttp] Progress check failed:`, e);
+          console.error(`[runCliViaHttp:${opts.cli}] Progress check failed:`, e);
         }
       }
     }
 
-    console.error(`[runGeminiViaHttp] Polling timeout`);
+    console.error(`[runCliViaHttp:${opts.cli}] Polling timeout`);
     return { success: false, sessionId: "", agentMessages: "", error: "HTTP 轮询超时" };
   } catch (e: any) {
-    console.error(`[runGeminiViaHttp] Exception:`, e.message);
+    console.error(`[runCliViaHttp:${opts.cli}] Exception:`, e.message);
     return { success: false, sessionId: "", agentMessages: "", error: `HTTP 服务不可用: ${e.message}` };
   }
 }
@@ -374,7 +406,7 @@ async function runGeminiDirectly(opts: {
 }
 
 /**
- * 通过 fork worker 调用后端执行器（Codex CLI）
+ * 通过 HTTP 服务调用后端执行器（Codex CLI），HTTP 不可用时回退到 worker
  */
 export async function callBackendExecutor(
   step: WorkflowStep,
@@ -395,14 +427,17 @@ export async function callBackendExecutor(
   if (step.session_id) args.push("resume", step.session_id);
   args.push("--", prompt);
 
-  const result = await runViaWorker({
-    cmd,
-    args,
-    cd,
-    env: { PYTHON: process.execPath },
-    sessionId: step.session_id ?? "",
-    timeoutMs,
-  });
+  const env = { PYTHON: process.execPath };
+  const sessionId = step.session_id ?? "";
+
+  let result: { success: boolean; sessionId: string; agentMessages: string; error?: string };
+  if (await isHttpServiceAvailable()) {
+    console.error(`[callBackendExecutor] HTTP service available, using HTTP path`);
+    result = await runCliViaHttp({ cli: "codex", cmd, args, cd, env, sessionId, timeoutMs });
+  } else {
+    console.error(`[callBackendExecutor] HTTP service unavailable, falling back to worker`);
+    result = await runViaWorker({ cmd, args, cd, env, sessionId, timeoutMs });
+  }
 
   return {
     success: result.success,
@@ -437,7 +472,8 @@ export async function callFrontendExecutor(
   ];
   if (step.session_id) args.push("--resume", step.session_id);
 
-  const result = await runGeminiViaHttp({
+  const result = await runCliViaHttp({
+    cli: "gemini",
     cmd,
     args,
     cd,
