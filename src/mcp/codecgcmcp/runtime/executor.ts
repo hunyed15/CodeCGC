@@ -160,15 +160,45 @@ async function runGeminiViaHttp(opts: {
     const { requestId } = await executeRes.json() as { requestId: string };
     console.error(`[runGeminiViaHttp] Got requestId: ${requestId}`);
 
-    // 轮询结果（每 2 秒）
+    // 轮询结果（每 2 秒）+ 心跳检测（每 60 秒检查进度）
     const startTime = Date.now();
+    let lastProgressCheck = startTime;
+    const PROGRESS_CHECK_INTERVAL = 60_000; // 每 60 秒检查一次进度
+
     while (Date.now() - startTime < opts.timeoutMs + 10000) {
       await new Promise(r => setTimeout(r, 2000));
 
+      // 先尝试获取结果
       const resultRes = await fetch(`${HTTP_SERVICE_URL}/result/${requestId}`);
       if (resultRes.ok) {
         console.error(`[runGeminiViaHttp] Got result after ${Date.now() - startTime}ms`);
         return await resultRes.json() as { success: boolean; sessionId: string; agentMessages: string; error?: string };
+      }
+
+      // 定期检查进度（心跳探查）
+      const now = Date.now();
+      if (now - lastProgressCheck > PROGRESS_CHECK_INTERVAL) {
+        lastProgressCheck = now;
+        try {
+          const progressRes = await fetch(`${HTTP_SERVICE_URL}/progress/${requestId}`);
+          if (progressRes.ok) {
+            const progress = await progressRes.json() as {
+              phase: string;
+              lastEventTime: number;
+              isAlive: boolean;
+              isStuck: boolean;
+              elapsedSinceLastEvent: number;
+            };
+            console.error(`[runGeminiViaHttp] Progress check: phase=${progress.phase}, isStuck=${progress.isStuck}, elapsed=${Math.floor(progress.elapsedSinceLastEvent / 1000)}s`);
+
+            // 如果检测到卡死，记录警告（但不中断，让超时机制处理）
+            if (progress.isStuck) {
+              console.error(`[runGeminiViaHttp] ⚠️ CLI appears stuck (no events for ${Math.floor(progress.elapsedSinceLastEvent / 1000)}s)`);
+            }
+          }
+        } catch (e) {
+          console.error(`[runGeminiViaHttp] Progress check failed:`, e);
+        }
       }
     }
 
