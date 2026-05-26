@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from "fs";
 import { writeFile, readFile } from "fs/promises";
 import { join, dirname } from "path";
+import { homedir } from "os";
 import { fileURLToPath } from "url";
 import { resolveProjectRoot, codecgcRoot, routingFile, ensureDir } from "../runtime/paths.js";
 import { writeYaml } from "../../../shared/yaml.js";
@@ -112,6 +113,24 @@ export async function init(args: InitArgs): Promise<InitResult> {
       warnings.push(`未找到包内 skills 源目录: ${skillsResult.source_dir}`);
     } else if (skillsResult.released.length === 0 && skillsResult.skipped.length === 0) {
       warnings.push(`未释放任何项目级 skill，请检查包内 skills 目录: ${skillsResult.source_dir}`);
+    }
+
+    // 7. 释放 Claude Code 项目级 memory（工作流强制执行规则）
+    try {
+      const memoryDir = getProjectMemoryDir(projectRoot);
+      const memoryFile = join(memoryDir, "codecgc-workflow-enforcement.md");
+      const memoryIndex = join(memoryDir, "MEMORY.md");
+
+      if (!existsSync(memoryFile) || force) {
+        await ensureDir(memoryDir);
+        await writeFile(memoryFile, getMemoryTemplate(), "utf-8");
+        await updateMemoryIndex(memoryIndex);
+        created.push("Claude Code memory (workflow enforcement)");
+      } else {
+        skipped.push("Claude Code memory (已存在)");
+      }
+    } catch (e) {
+      warnings.push(`Claude Code memory 释放失败: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     const totalCreated = created.length;
@@ -241,7 +260,7 @@ async function releaseProjectSkills(projectRoot: string, force: boolean): Promis
 }
 
 function getDefaultClaudeMd(): string {
-  return `# CodeCGC 工作流提示词
+  return `# CodeCGC 工作流规则
 
 ## 核心分工
 
@@ -249,6 +268,38 @@ function getDefaultClaudeMd(): string {
 - Codex：后端代码执行。
 - Gemini：前端代码执行。
 - NodeCGC：路由、审计、状态闭环。
+
+## 禁止行为（红线）
+
+以下行为会导致工作流断裂、审计缺失、交付质量下降，**绝对不允许**：
+
+1. ❌ 直接用 Edit/Write 工具修改 \`src/\`、\`lib/\`、\`app/\` 等产品源码
+2. ❌ 在没有调用 codecgc.build/fix 的情况下提交产品代码
+3. ❌ Codex/Gemini 超时后自行编写替代代码（应诊断超时原因或重试）
+4. ❌ 对 P0/bugfix 类需求跳过 "创建 workflow → plan → build/fix" 流程
+
+## 自检触发条件
+
+当以下条件**全部满足**时，你**必须**先调用 codecgc.entry + codecgc.plan：
+- 用户要求修改产品代码（非 .codecgc/、.claude/、docs/、README）
+- 当前没有活跃的 workflow 覆盖该路径
+
+## 允许直接编辑的路径（白名单）
+
+仅以下路径可由 Claude 直接编辑，无需经过 workflow：
+
+- \`.codecgc/**\` — 工作流配置
+- \`.claude/**\` — Claude 配置
+- \`.mcp.json\` — MCP 配置
+- \`docs/**\` — 文档
+- \`README.md\`、\`CHANGELOG.md\` — 项目说明
+
+## 超时处理规范
+
+当 Codex 或 Gemini 执行超时时：
+1. 查看超时日志，分析根因
+2. 调整 timeout_seconds 后重试
+3. **不要**自行编写代码替代——这会破坏工作流闭环
 
 ## 首选入口
 
@@ -271,23 +322,11 @@ MCP 可用时优先调用 codecgcmcp 工具：
 根据用户需求的**语义**判断，直接传递 \`executor_hint\` 参数：
 
 - **前端任务**（UI、组件、样式、前端交互）→ \`executor_hint: "frontend"\`
-  - 示例："前端工作台接入 API"、"Dashboard 显示调度状态"、"修改按钮样式"
 - **后端任务**（API、数据库、服务端逻辑）→ \`executor_hint: "backend"\`
-  - 示例："后端 API 增加字段"、"数据库迁移"、"修复认证逻辑"
 - **文档任务**（README、CHANGELOG、设计文档）→ \`executor_hint: "docs"\`
-  - 示例："更新 API 文档"、"补充安装说明"
-- **全栈任务**（前后端都要改）→ \`executor_hint: "both"\`
-  - 示例："新增用户管理功能"、"实现完整的登录流程"
-  - 系统会自动拆分为前端 + 后端两个步骤
-
-**使用场景：**
-- 用户需求明确提到"前端"、"后端"、"UI"、"API"等关键词
-- 路径可能有歧义（如 \`frontend/src/app/services/api.ts\`），但语义明确是前端任务
-- 避免路由规则误判
+- **全栈任务**（前后端都要改）→ \`executor_hint: "both"\`（自动拆分）
 
 ### 2. 目录约定（次优先级）
-
-如果没有 \`executor_hint\`，优先匹配目录约定：
 
 - \`**/frontend/**\` → frontend
 - \`**/backend/**\` → backend
@@ -295,15 +334,7 @@ MCP 可用时优先调用 codecgcmcp 工具：
 
 ### 3. routing.yaml 规则（兜底）
 
-如果目录约定也不匹配，使用 \`.codecgc/config/routing.yaml\` 的扩展名和路径模式规则。
-
-## 写入边界
-
-\`.codecgc/config/routing.yaml\` 是路径归属策略来源。
-
-Claude 可直接处理：\`.codecgc/**\`、\`.claude/**\`、\`.mcp.json\`、\`docs/**\`、\`README.md\`、\`CHANGELOG.md\`
-
-Claude 不应直接修改产品源码——后端交 Codex，前端交 Gemini。
+使用 \`.codecgc/config/routing.yaml\` 的扩展名和路径模式规则。
 
 ## 标准流程
 
@@ -311,4 +342,58 @@ Claude 不应直接修改产品源码——后端交 Codex，前端交 Gemini。
 需求 → 规划 → 路由 → Codex/Gemini 执行 → 审计 → Claude 审核 → 关闭
 \`\`\`
 `;
+}
+
+/**
+ * 计算 Claude Code 项目级 memory 目录路径
+ * 格式: ~/.claude/projects/<encoded-project-path>/memory/
+ */
+function getProjectMemoryDir(projectRoot: string): string {
+  const resolved = projectRoot.replace(/:/g, "-").replace(/[/\\]/g, "-");
+  return join(homedir(), ".claude", "projects", resolved, "memory");
+}
+
+/**
+ * 通用 memory 模板（feedback 类型）
+ * 随 codecgc.init 释放到项目级 memory，防止 Claude 绕过工作流
+ */
+function getMemoryTemplate(): string {
+  return `---
+name: codecgc-workflow-enforcement
+description: CodeCGC 项目中必须通过工作流执行产品代码修改，禁止直接 Edit/Write
+metadata:
+  type: feedback
+---
+
+产品代码修改必须通过 CodeCGC 工作流执行，禁止直接用 Edit/Write 工具修改 src/、lib/、app/ 等产品源码。
+
+**Why:** Claude 有绕过工作流直接写代码的倾向，尤其在以下场景：
+1. Codex/Gemini 超时后自行编写替代代码（应诊断原因或重试）
+2. 连续成功后把"小改动"当例外跳过流程
+3. P0/bugfix 被当"紧急修复"直接处理
+4. Context 压缩后规则被淡化
+
+**How to apply:**
+- 产品代码修改：codecgc.entry → codecgc.plan → codecgc.build/fix
+- Codex/Gemini 超时：诊断原因或重试，不要自行替代
+- P0/bugfix：即使是"一行改动"也要走 workflow
+- 用户说"帮我改 XXX"：默认路由到 /cgc skill
+- 允许直接编辑：.codecgc/**、.claude/**、.mcp.json、docs/**、README.md、CHANGELOG.md
+`;
+}
+
+/**
+ * 更新 MEMORY.md 索引，追加 CodeCGC 记忆条目
+ * 如果 MEMORY.md 不存在则创建；已包含则跳过
+ */
+async function updateMemoryIndex(indexPath: string): Promise<void> {
+  const entry = "- [CodeCGC 工作流强制执行](codecgc-workflow-enforcement.md) — 产品代码修改必须走 workflow，禁止直接 Edit/Write";
+
+  if (existsSync(indexPath)) {
+    const content = await readFile(indexPath, "utf-8");
+    if (content.includes("codecgc-workflow-enforcement")) return; // 已包含
+    await writeFile(indexPath, content.trimEnd() + "\n" + entry + "\n", "utf-8");
+  } else {
+    await writeFile(indexPath, entry + "\n", "utf-8");
+  }
 }

@@ -27,6 +27,9 @@ import { manual, type ManualArgs } from "./tools/manual.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// 工具返回值 footer：每次调用都提醒工作流规则，对抗 context compaction 后规则丢失
+const WORKFLOW_FOOTER = "\n\n> 📌 CodeCGC: 产品代码修改必须通过 build/fix 执行，禁止直接 Edit/Write 产品源码。";
+
 const TOOLS: Tool[] = [
   {
     name: "codecgc.entry",
@@ -369,7 +372,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     return {
-      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) + WORKFLOW_FOOTER }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
