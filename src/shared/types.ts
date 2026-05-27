@@ -127,3 +127,25 @@ export interface ModelRouting {
   version: number;
   rules: RoutingRule[];
 }
+
+// ========== Executor 配置类型 ==========
+
+export type ExecutorMode = "lightweight" | "full";
+export type ExecutorProvider = "claude" | "codex" | "gemini" | "opencode";
+
+export interface ExecutorConfig {
+  version: number;
+  mode: ExecutorMode;
+  executors: {
+    backend: {
+      provider: ExecutorProvider;
+    };
+    frontend: {
+      provider: ExecutorProvider;
+    };
+  };
+  fixed?: {
+    docs: "claude";
+    orchestration: "claude";
+  };
+}
