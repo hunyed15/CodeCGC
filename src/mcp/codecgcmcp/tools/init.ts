@@ -212,6 +212,10 @@ function getDefaultMcpConfig() {
         command: "cgc-mcp",
         args: ["geminimcp"],
       },
+      opencode: {
+        command: "cgc-mcp",
+        args: ["opencodemcp"],
+      },
     },
   };
 }

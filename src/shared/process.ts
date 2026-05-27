@@ -34,9 +34,11 @@ function findNodeModuleEntry(shimPath: string, name: string): string | null {
     // npm 全局安装布局
     path.join(shimDir, "..", "lib", "node_modules", `@openai/${name}`, "bin", `${name}.js`),
     path.join(shimDir, "..", "lib", "node_modules", `@google/${name}-cli`, "bundle", `${name}.js`),
+    path.join(shimDir, "..", "lib", "node_modules", `@opencode-ai/${name}`, "bin", `${name}.js`),
     // Windows npm 全局布局
     path.join(shimDir, "node_modules", `@openai/${name}`, "bin", `${name}.js`),
     path.join(shimDir, "node_modules", `@google/${name}-cli`, "bundle", `${name}.js`),
+    path.join(shimDir, "node_modules", `@opencode-ai/${name}`, "bin", `${name}.js`),
   ];
 
   for (const candidate of candidates) {

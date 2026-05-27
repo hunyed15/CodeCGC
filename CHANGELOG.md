@@ -2,6 +2,25 @@
 
 All notable changes to CodeCGC will be documented in this file.
 
+## [1.0.12] - 2026-05-27
+
+### ✨ Features
+
+#### OpenCode MCP 集成
+- **新增**：`opencodemcp` MCP 服务器，支持 OpenCode CLI 作为前端执行器
+- **新增**：`opencode` 通用会话执行器工具
+- **新增**：`implement_frontend_task` 前端任务执行器（OpenCode 版本）
+- **架构**：复用双路由策略（HTTP 优先 + Stdio fallback），与 Codex/Gemini 一致
+- **配置**：`codecgc.init` 自动生成 `.mcp.json` 包含 `opencode` 服务器配置
+- **CLI**：`cgc-mcp opencodemcp` 启动 OpenCode MCP 服务器
+- **HTTP**：`cli-http-service.cjs` 已支持 `opencode` CLI 类型
+
+### 🔧 Improvements
+- **类型**：新增 `OpenCodeOptions` 接口到 `shared/types.ts`
+- **路径解析**：`resolveCliCommand` 支持 `@opencode-ai/opencode` 包路径
+
+---
+
 ## [1.0.2] - 2026-05-24
 
 ### 🐛 Fixes

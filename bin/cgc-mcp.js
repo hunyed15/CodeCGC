@@ -9,6 +9,7 @@ const __dirname = dirname(__filename);
 const serverMap = {
   codexmcp: join(__dirname, "..", "dist", "mcp", "codexmcp", "server.js"),
   geminimcp: join(__dirname, "..", "dist", "mcp", "geminimcp", "server.js"),
+  opencodemcp: join(__dirname, "..", "dist", "mcp", "opencodemcp", "server.js"),
   codecgcmcp: join(__dirname, "..", "dist", "mcp", "codecgcmcp", "server.js"),
 };
 

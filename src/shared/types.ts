@@ -34,6 +34,16 @@ export interface GeminiOptions {
   timeoutMs?: number;
 }
 
+export interface OpenCodeOptions {
+  prompt: string;
+  cd: string;
+  sandbox?: boolean;
+  sessionId?: string;
+  returnAllMessages?: boolean;
+  model?: string;
+  timeoutMs?: number;
+}
+
 export interface BackendTaskOptions {
   taskId: string;
   taskSummary: string;
