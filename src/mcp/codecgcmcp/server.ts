@@ -92,12 +92,30 @@ const TOOLS: Tool[] = [
   },
   {
     name: "codecgc.init",
-    description: "初始化项目（创建 .codecgc/ 目录、.codecgc/config/routing.yaml、.mcp.json、.claude/CLAUDE.md）",
+    description: "初始化项目（创建 .codecgc/ 目录、.codecgc/config/routing.yaml、executors.yaml、.mcp.json、.claude/CLAUDE.md）",
     inputSchema: {
       type: "object",
       properties: {
         cd: { type: "string", description: "项目根目录" },
         force: { type: "boolean", description: "强制覆盖已存在的文件" },
+        mode: {
+          type: "string",
+          enum: ["lightweight", "full"],
+          description: "工作模式：lightweight（只用 Claude）或 full（专业工具执行）",
+          default: "lightweight",
+        },
+        backend: {
+          type: "string",
+          enum: ["claude", "codex"],
+          description: "后端执行器（仅 full 模式有效）",
+          default: "claude",
+        },
+        frontend: {
+          type: "string",
+          enum: ["claude", "gemini", "opencode"],
+          description: "前端执行器（仅 full 模式有效）",
+          default: "claude",
+        },
       },
     },
   },

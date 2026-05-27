@@ -5,6 +5,8 @@ import { homedir } from "os";
 import { fileURLToPath } from "url";
 import { resolveProjectRoot, codecgcRoot, routingFile, ensureDir } from "../runtime/paths.js";
 import { writeYaml } from "../../../shared/yaml.js";
+import { getLightweightModeConfig, getFullModeConfig } from "../../../shared/executor-config.js";
+import type { ExecutorConfig } from "../../../shared/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,6 +17,9 @@ const GLOBAL_ONLY_SKILLS = ["cgc-init", "cgc"];
 export interface InitArgs {
   cd?: string;
   force?: boolean;
+  mode?: "lightweight" | "full";
+  backend?: "claude" | "codex";
+  frontend?: "claude" | "gemini" | "opencode";
 }
 
 export interface InitResult {
@@ -38,6 +43,11 @@ export async function init(args: InitArgs): Promise<InitResult> {
   try {
     const projectRoot = resolveProjectRoot(args.cd);
     const force = args.force ?? false;
+
+    // 确定模式和执行器配置
+    const mode = args.mode ?? "lightweight";
+    const backend = args.backend ?? "claude";
+    const frontend = args.frontend ?? "claude";
 
     const created: string[] = [];
     const skipped: string[] = [];
@@ -64,6 +74,19 @@ export async function init(args: InitArgs): Promise<InitResult> {
       skipped.push(".codecgc/config/routing.yaml (已存在)");
     }
 
+    // 2.5. 写入 .codecgc/config/executors.yaml
+    const executorsPath = join(root, "config", "executors.yaml");
+    if (!existsSync(executorsPath) || force) {
+      await ensureDir(join(root, "config"));
+      const executorConfig: ExecutorConfig = mode === "lightweight"
+        ? getLightweightModeConfig()
+        : getFullModeConfig(backend as "codex" | "claude", frontend as "opencode" | "gemini" | "claude");
+      await writeYaml(executorsPath, executorConfig);
+      created.push(".codecgc/config/executors.yaml");
+    } else {
+      skipped.push(".codecgc/config/executors.yaml (已存在)");
+    }
+
     // 3. 写入 .claude/CLAUDE.md（AI 提示词）
     const claudeDir = join(projectRoot, ".claude");
     const claudeMdPath = join(claudeDir, "CLAUDE.md");
@@ -75,10 +98,11 @@ export async function init(args: InitArgs): Promise<InitResult> {
       skipped.push(".claude/CLAUDE.md (已存在)");
     }
 
-    // 4. 写入 .mcp.json
+    // 4. 写入 .mcp.json（根据模式和执行器选择）
     const mcpPath = join(projectRoot, ".mcp.json");
     if (!existsSync(mcpPath) || force) {
-      await writeFile(mcpPath, JSON.stringify(getDefaultMcpConfig(), null, 2), "utf-8");
+      const mcpConfig = generateMcpConfig(mode, backend, frontend);
+      await writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf-8");
       created.push(".mcp.json");
     } else {
       skipped.push(".mcp.json (已存在)");
@@ -137,6 +161,28 @@ export async function init(args: InitArgs): Promise<InitResult> {
     const skillSummary = skillsResult.missing_source
       ? "项目级 skills 未释放：未找到包内 skills 源目录。"
       : `项目级 skills：新增 ${skillsResult.released.length} 个，已存在 ${skillsResult.skipped.length} 个，目录 ${skillsResult.target_dir}`;
+
+    // 生成推荐信息
+    let recommendation = "";
+    if (totalCreated === 0) {
+      recommendation = `项目已初始化，无需重复操作。${skillSummary}`;
+    } else {
+      const modeDesc = mode === "lightweight" ? "轻量模式（Claude 处理所有任务）" : "完全模式";
+      const installHints: string[] = [];
+
+      if (mode === "full") {
+        if (backend === "codex") installHints.push("npm install -g @openai/codex");
+        if (frontend === "gemini") installHints.push("npm install -g @google/gemini-cli");
+        if (frontend === "opencode") installHints.push("npm install -g @opencode-ai/opencode");
+      }
+
+      const installMsg = installHints.length > 0
+        ? `\n\n需要安装执行器：\n${installHints.map(h => `  ${h}`).join("\n")}`
+        : "";
+
+      recommendation = `已创建 ${totalCreated} 项。${skillSummary}\n\n工作模式：${modeDesc}${installMsg}\n\n下一步：调用 codecgc.entry 创建第一个 workflow。`;
+    }
+
     return {
       success: true,
       project_root: projectRoot,
@@ -144,10 +190,7 @@ export async function init(args: InitArgs): Promise<InitResult> {
       skipped_files: skipped,
       warnings,
       project_skills: skillsResult,
-      recommendation:
-        totalCreated === 0
-          ? `项目已初始化，无需重复操作。${skillSummary}`
-          : `已创建 ${totalCreated} 项。${skillSummary} 下一步：调用 codecgc.entry 创建第一个 workflow。`,
+      recommendation,
     };
   } catch (error) {
     return {
@@ -218,6 +261,51 @@ function getDefaultMcpConfig() {
       },
     },
   };
+}
+
+/**
+ * 根据模式和执行器选择生成 .mcp.json 配置
+ */
+function generateMcpConfig(
+  mode: "lightweight" | "full",
+  backend: string,
+  frontend: string
+): { mcpServers: Record<string, { command: string; args: string[] }> } {
+  const mcpServers: Record<string, { command: string; args: string[] }> = {
+    codecgc: {
+      command: "cgc-mcp",
+      args: ["codecgcmcp"],
+    },
+  };
+
+  // 轻量模式：只需要 codecgc
+  if (mode === "lightweight") {
+    return { mcpServers };
+  }
+
+  // 完全模式：根据选择添加 MCP 服务器
+  if (backend === "codex") {
+    mcpServers.codex = {
+      command: "cgc-mcp",
+      args: ["codexmcp"],
+    };
+  }
+
+  if (frontend === "gemini") {
+    mcpServers.gemini = {
+      command: "cgc-mcp",
+      args: ["geminimcp"],
+    };
+  }
+
+  if (frontend === "opencode") {
+    mcpServers.opencode = {
+      command: "cgc-mcp",
+      args: ["opencodemcp"],
+    };
+  }
+
+  return { mcpServers };
 }
 
 /**
