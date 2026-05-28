@@ -2,6 +2,17 @@
 
 All notable changes to CodeCGC will be documented in this file.
 
+## [1.0.14] - 2026-05-28
+
+### 📝 Docs
+- **更新**：README.md 架构图、工作模式、路由策略、环境要求
+- **更新**：.gitignore 添加临时测试目录
+
+### 🔧 Refactor
+- **重构**：build.ts/fix.ts 提取共享逻辑到 step-executor.ts（-165 行）
+
+---
+
 ## [1.0.13] - 2026-05-28
 
 ### ✨ Features
