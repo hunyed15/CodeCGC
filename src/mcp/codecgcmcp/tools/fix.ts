@@ -9,6 +9,7 @@ import {
 import { resolveProjectRoot, validateStepPaths } from "../runtime/paths.js";
 import { callExecutor } from "../runtime/executor.js";
 import { readRouting, classifyPaths } from "../runtime/routing.js";
+import { loadExecutorConfig } from "../../../shared/executor-config.js";
 import { autoCollectReviewContext } from "./auto-review.js";
 import type { ReviewRequest } from "./review.js";
 import type { WorkflowKind } from "../../../shared/types.js";
@@ -83,8 +84,12 @@ export async function fix(args: FixArgs): Promise<FixResult> {
       throw new Error(`步骤 ${step.id} 状态为 ${step.status}，不是 pending`);
     }
 
-    // docs/orchestration 步骤应使用 codecgc.manual 工具
-    if (step.executor === "docs" || step.executor === "orchestration") {
+    // 读取 executor 配置
+    const executorConfig = await loadExecutorConfig(projectRoot);
+
+    // 完全模式下，docs/orchestration 步骤应使用 codecgc.manual 工具
+    // 轻量模式下，Claude 可以处理所有步骤类型
+    if (executorConfig.mode === "full" && (step.executor === "docs" || step.executor === "orchestration")) {
       throw new Error(
         `步骤 ${step.id} 的 executor 是 ${step.executor}，应使用 codecgc.manual 工具手动标记完成`
       );
@@ -92,20 +97,22 @@ export async function fix(args: FixArgs): Promise<FixResult> {
 
     validateStepPaths(step.paths);
 
-    // ✅ 修复 P2 问题 #7：前置路径归属检查（在执行器调用前）
-    const routing = await readRouting(projectRoot);
-    const classified = classifyPaths(step.paths, routing);
-    if (step.executor === "backend" && classified.has("frontend")) {
-      const frontendPaths = classified.get("frontend") || [];
-      throw new Error(
-        `后端步骤 ${step.id} 包含前端路径，拒绝执行: ${frontendPaths.slice(0, 3).join(", ")}${frontendPaths.length > 3 ? ` (and ${frontendPaths.length - 3} more)` : ""}`
-      );
-    }
-    if (step.executor === "frontend" && classified.has("backend")) {
-      const backendPaths = classified.get("backend") || [];
-      throw new Error(
-        `前端步骤 ${step.id} 包含后端路径，拒绝执行: ${backendPaths.slice(0, 3).join(", ")}${backendPaths.length > 3 ? ` (and ${backendPaths.length - 3} more)` : ""}`
-      );
+    // ✅ 前置路径归属检查（仅完全模式）
+    if (executorConfig.mode === "full") {
+      const routing = await readRouting(projectRoot);
+      const classified = classifyPaths(step.paths, routing);
+      if (step.executor === "backend" && classified.has("frontend")) {
+        const frontendPaths = classified.get("frontend") || [];
+        throw new Error(
+          `后端步骤 ${step.id} 包含前端路径，拒绝执行: ${frontendPaths.slice(0, 3).join(", ")}${frontendPaths.length > 3 ? ` (and ${frontendPaths.length - 3} more)` : ""}`
+        );
+      }
+      if (step.executor === "frontend" && classified.has("backend")) {
+        const backendPaths = classified.get("backend") || [];
+        throw new Error(
+          `前端步骤 ${step.id} 包含后端路径，拒绝执行: ${backendPaths.slice(0, 3).join(", ")}${backendPaths.length > 3 ? ` (and ${backendPaths.length - 3} more)` : ""}`
+        );
+      }
     }
 
     const timeoutMs = (args.timeout_seconds ?? 600) * 1000;

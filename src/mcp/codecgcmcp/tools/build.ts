@@ -9,6 +9,7 @@ import {
 import { resolveProjectRoot, validateStepPaths } from "../runtime/paths.js";
 import { callExecutor } from "../runtime/executor.js";
 import { readRouting, classifyPaths } from "../runtime/routing.js";
+import { loadExecutorConfig } from "../../../shared/executor-config.js";
 import { autoCollectReviewContext } from "./auto-review.js";
 import type { ReviewRequest } from "./review.js";
 import type { WorkflowKind } from "../../../shared/types.js";
@@ -87,8 +88,12 @@ export async function build(args: BuildArgs): Promise<BuildResult> {
       throw new Error(`Step ${step.id} status is ${step.status}, not pending`);
     }
 
-    // docs/orchestration steps should use codecgc.manual tool
-    if (step.executor === "docs" || step.executor === "orchestration") {
+    // 读取 executor 配置
+    const executorConfig = await loadExecutorConfig(projectRoot);
+
+    // 完全模式下，docs/orchestration 步骤应使用 codecgc.manual 工具
+    // 轻量模式下，Claude 可以处理所有步骤类型
+    if (executorConfig.mode === "full" && (step.executor === "docs" || step.executor === "orchestration")) {
       throw new Error(
         `Step ${step.id} executor is ${step.executor}, should use codecgc.manual tool to mark as done`
       );
@@ -97,20 +102,22 @@ export async function build(args: BuildArgs): Promise<BuildResult> {
     // Defensive check: reject step.paths containing ../ or absolute paths
     validateStepPaths(step.paths);
 
-    // Pre-execution path ownership check
-    const routing = await readRouting(projectRoot);
-    const classified = classifyPaths(step.paths, routing);
-    if (step.executor === "backend" && classified.has("frontend")) {
-      const frontendPaths = classified.get("frontend") || [];
-      throw new Error(
-        `Backend step ${step.id} contains frontend paths, refusing to execute: ${frontendPaths.slice(0, 3).join(", ")}${frontendPaths.length > 3 ? ` (and ${frontendPaths.length - 3} more)` : ""}`
-      );
-    }
-    if (step.executor === "frontend" && classified.has("backend")) {
-      const backendPaths = classified.get("backend") || [];
-      throw new Error(
-        `Frontend step ${step.id} contains backend paths, refusing to execute: ${backendPaths.slice(0, 3).join(", ")}${backendPaths.length > 3 ? ` (and ${backendPaths.length - 3} more)` : ""}`
-      );
+    // Pre-execution path ownership check（仅完全模式）
+    if (executorConfig.mode === "full") {
+      const routing = await readRouting(projectRoot);
+      const classified = classifyPaths(step.paths, routing);
+      if (step.executor === "backend" && classified.has("frontend")) {
+        const frontendPaths = classified.get("frontend") || [];
+        throw new Error(
+          `Backend step ${step.id} contains frontend paths, refusing to execute: ${frontendPaths.slice(0, 3).join(", ")}${frontendPaths.length > 3 ? ` (and ${frontendPaths.length - 3} more)` : ""}`
+        );
+      }
+      if (step.executor === "frontend" && classified.has("backend")) {
+        const backendPaths = classified.get("backend") || [];
+        throw new Error(
+          `Frontend step ${step.id} contains backend paths, refusing to execute: ${backendPaths.slice(0, 3).join(", ")}${backendPaths.length > 3 ? ` (and ${backendPaths.length - 3} more)` : ""}`
+        );
+      }
     }
 
     const timeoutMs = (args.timeout_seconds ?? 600) * 1000;
