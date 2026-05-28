@@ -7,6 +7,7 @@ import { randomBytes } from "crypto";
 import { tmpdir } from "os";
 import type { StepExecutor, WorkflowStep } from "../../../shared/types.js";
 import { resolveCliCommand, tryParseJson } from "../../../shared/process.js";
+import { loadExecutorConfig } from "../../../shared/executor-config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -30,7 +31,7 @@ export interface ExecutorCallResult {
  * 异步 spawn 不阻塞事件循环（保持 MCP 协议心跳），结果通过临时文件传递
  */
 async function runViaWorker(opts: {
-  cli?: "codex" | "gemini";
+  cli?: "codex" | "gemini" | "opencode";
   cmd: string[];
   args: string[];
   cd: string;
@@ -163,7 +164,7 @@ async function isHttpServiceAvailable(): Promise<boolean> {
  * 提交执行请求 → 轮询结果，期间定期查询进度
  */
 async function runCliViaHttp(opts: {
-  cli: "gemini" | "codex";
+  cli: "gemini" | "codex" | "opencode";
   cmd: string[];
   args: string[];
   cd: string;
@@ -498,6 +499,68 @@ export async function callFrontendExecutor(
   };
 }
 
+/**
+ * 通过 HTTP 服务调用前端执行器（OpenCode CLI），HTTP 不可用时回退到 worker
+ */
+export async function callOpenCodeExecutor(
+  step: WorkflowStep,
+  projectRoot: string,
+  timeoutMs = 900_000
+): Promise<ExecutorCallResult> {
+  const cmd = await resolveCliCommand("opencode");
+  const cd = resolve(step.cd ?? projectRoot);
+  const prompt = buildFrontendPrompt(step);
+
+  const args = [
+    "--json",
+    "--prompt", prompt,
+  ];
+  if (step.session_id) args.push("--resume", step.session_id);
+
+  const env = { NODE_OPTIONS: "" };
+  const sessionId = step.session_id ?? "";
+
+  let result: { success: boolean; sessionId: string; agentMessages: string; error?: string };
+  if (await isHttpServiceAvailable()) {
+    console.error(`[callOpenCodeExecutor] HTTP service available, using HTTP path`);
+    result = await runCliViaHttp({ cli: "opencode", cmd, args, cd, env, sessionId, timeoutMs });
+  } else {
+    console.error(`[callOpenCodeExecutor] HTTP service unavailable, falling back to worker`);
+    result = await runViaWorker({ cli: "opencode", cmd, args, cd, env, sessionId, timeoutMs });
+  }
+
+  return {
+    success: result.success,
+    sessionId: result.sessionId,
+    summary: result.agentMessages,
+    agentMessages: result.agentMessages,
+    changedFiles: [],
+    policyChecks: result.success ? ["opencode_executor_completed"] : [],
+    risks: [],
+    error: result.error,
+  };
+}
+
+/**
+ * 轻量模式执行器 — Claude 直接处理，不调用外部 CLI
+ * 返回结果指示 Claude 应自行执行此步骤
+ */
+export function callClaudeExecutor(
+  step: WorkflowStep,
+): ExecutorCallResult {
+  const prompt = step.executor === "backend" ? buildBackendPrompt(step) : buildFrontendPrompt(step);
+
+  return {
+    success: true,
+    sessionId: `claude-direct-${step.id}`,
+    summary: `[轻量模式] 步骤 ${step.id} 由 Claude 直接处理`,
+    agentMessages: prompt,
+    changedFiles: step.paths,
+    policyChecks: ["claude_direct_execution"],
+    risks: [],
+  };
+}
+
 function buildBackendPrompt(step: WorkflowStep): string {
   const MAX_FIELD_LENGTH = 10000;
   const MAX_ARRAY_LENGTH = 200;
@@ -575,7 +638,7 @@ function buildFrontendPrompt(step: WorkflowStep): string {
 }
 
 /**
- * 根据 executor 类型路由调用
+ * 根据 executor 类型路由调用（读取 executors.yaml 配置）
  */
 export async function callExecutor(
   step: WorkflowStep,
@@ -593,12 +656,32 @@ export async function callExecutor(
     throw new Error("timeoutMs must be between 1 and 3600000 (1 hour)");
   }
 
+  // 读取 executor 配置
+  const config = await loadExecutorConfig(projectRoot);
+
   if (step.executor === "backend") {
+    const provider = config.executors.backend.provider;
+    if (provider === "claude" || config.mode === "lightweight") {
+      console.error(`[callExecutor] 轻量模式/backend provider=claude, Claude 直接处理`);
+      return callClaudeExecutor(step);
+    }
+    // provider === "codex"
     return callBackendExecutor(step, projectRoot, timeoutMs);
   }
+
   if (step.executor === "frontend") {
+    const provider = config.executors.frontend.provider;
+    if (provider === "claude" || config.mode === "lightweight") {
+      console.error(`[callExecutor] 轻量模式/frontend provider=claude, Claude 直接处理`);
+      return callClaudeExecutor(step);
+    }
+    if (provider === "opencode") {
+      return callOpenCodeExecutor(step, projectRoot, timeoutMs);
+    }
+    // provider === "gemini"
     return callFrontendExecutor(step, projectRoot, timeoutMs);
   }
+
   if (step.executor === "docs" || step.executor === "orchestration") {
     // docs 和 orchestration 由 Claude 直接处理，不调用执行器
     throw new Error(`${step.executor} 步骤应由 Claude 直接处理，不应调用执行器`);

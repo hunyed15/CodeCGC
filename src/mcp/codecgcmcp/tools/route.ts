@@ -4,6 +4,7 @@ import {
   hasMixedOwnership,
 } from "../runtime/routing.js";
 import { resolveProjectRoot } from "../runtime/paths.js";
+import { loadExecutorConfig } from "../../../shared/executor-config.js";
 import type { PathOwnership, StepExecutor } from "../../../shared/types.js";
 
 export interface RouteArgs {
@@ -14,10 +15,12 @@ export interface RouteArgs {
 
 export interface RouteResult {
   success: boolean;
+  mode?: "lightweight" | "full";
   paths: string[];
   classification: Record<PathOwnership, string[]>;
   is_mixed: boolean;
   recommended_executor?: StepExecutor;
+  actual_provider?: string;
   recommended_split?: Array<{
     executor: StepExecutor;
     paths: string[];
@@ -69,6 +72,29 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
 
     const projectRoot = resolveProjectRoot(args.cd);
 
+    // 读取 executor 配置
+    const executorConfig = await loadExecutorConfig(projectRoot);
+
+    // 轻量模式：所有路径都由 Claude 处理
+    if (executorConfig.mode === "lightweight") {
+      return {
+        success: true,
+        mode: "lightweight",
+        paths: args.paths,
+        classification: {
+          backend: [],
+          frontend: [],
+          shared: [],
+          docs: [],
+          unknown: [],
+        },
+        is_mixed: false,
+        recommended_executor: "orchestration",
+        actual_provider: "claude",
+        recommendation: "轻量模式：所有路径由 Claude 直接处理",
+      };
+    }
+
     // Priority 1: Explicit declaration (executor_hint)
     if (args.executor_hint) {
       if (args.executor_hint === "both") {
@@ -80,11 +106,13 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
       const executor = hintToExecutor(args.executor_hint);
       return {
         success: true,
+        mode: "full",
         paths: args.paths,
         classification: buildClassificationFromHint(args.paths, args.executor_hint),
         is_mixed: false,
         recommended_executor: executor,
-        recommendation: `Based on executor_hint="${args.executor_hint}", recommend executor: ${executor}`,
+        actual_provider: resolveProvider(executor, executorConfig),
+        recommendation: `Based on executor_hint="${args.executor_hint}", recommend executor: ${executor} (provider: ${resolveProvider(executor, executorConfig)})`,
       };
     }
 
@@ -120,11 +148,13 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
       const executor = ownershipToExecutor(ownership);
       return {
         success: true,
+        mode: "full",
         paths: args.paths,
         classification,
         is_mixed: false,
         recommended_executor: executor,
-        recommendation: `All paths belong to ${ownership}, recommend executor: ${executor}`,
+        actual_provider: resolveProvider(executor, executorConfig),
+        recommendation: `All paths belong to ${ownership}, recommend executor: ${executor} (provider: ${resolveProvider(executor, executorConfig)})`,
       };
     }
 
@@ -162,6 +192,7 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
 
     return {
       success: true,
+      mode: "full",
       paths: args.paths,
       classification,
       is_mixed: true,
@@ -201,6 +232,23 @@ function ownershipToExecutor(ownership: PathOwnership): StepExecutor {
     case "unknown":
     default:
       return "orchestration";
+  }
+}
+
+/**
+ * 根据 executor 类型和配置返回实际 provider 名称
+ */
+function resolveProvider(executor: StepExecutor, config: { executors: { backend: { provider: string }; frontend: { provider: string } } }): string {
+  switch (executor) {
+    case "backend":
+      return config.executors.backend.provider;
+    case "frontend":
+      return config.executors.frontend.provider;
+    case "docs":
+    case "orchestration":
+      return "claude";
+    default:
+      return "claude";
   }
 }
 
