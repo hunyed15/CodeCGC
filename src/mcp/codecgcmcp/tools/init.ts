@@ -92,7 +92,7 @@ export async function init(args: InitArgs): Promise<InitResult> {
     const claudeMdPath = join(claudeDir, "CLAUDE.md");
     if (!existsSync(claudeMdPath) || force) {
       await ensureDir(claudeDir);
-      await writeFile(claudeMdPath, getDefaultClaudeMd(), "utf-8");
+      await writeFile(claudeMdPath, getDefaultClaudeMd(mode, backend, frontend), "utf-8");
       created.push(".claude/CLAUDE.md");
     } else {
       skipped.push(".claude/CLAUDE.md (已存在)");
@@ -351,60 +351,44 @@ async function releaseProjectSkills(projectRoot: string, force: boolean): Promis
   return result;
 }
 
-function getDefaultClaudeMd(): string {
-  return `# CodeCGC 工作流规则
+function getDefaultClaudeMd(
+  mode: "lightweight" | "full" = "lightweight",
+  backend: string = "claude",
+  frontend: string = "claude"
+): string {
+  const isLightweight = mode === "lightweight";
 
-## 核心分工
+  // 后端/前端执行器描述
+  const backendDesc = backend === "codex" ? "Codex（OpenAI）" : "Claude";
+  const frontendDesc = frontend === "opencode" ? "OpenCode" : frontend === "gemini" ? "Gemini（Google）" : "Claude";
 
-- Claude：需求澄清、规划、设计、文档、审核、验收。
-- Codex：后端代码执行。
-- Gemini：前端代码执行。
-- NodeCGC：路由、审计、状态闭环。
+  // 核心分工部分
+  const coreRoles = isLightweight
+    ? `- Claude：所有代码任务（需求澄清、规划、设计、编码、审核、验收）。`
+    : `- Claude：需求澄清、规划、设计、文档、审核、验收。
+- ${backendDesc}：后端代码执行（需通过 codecgc.build 调用）。
+- ${frontendDesc}：前端代码执行（需通过 codecgc.build 调用）。
+- NodeCGC：路由、审计、状态闭环。`;
 
-## 禁止行为（红线）
-
-以下行为会导致工作流断裂、审计缺失、交付质量下降，**绝对不允许**：
-
-1. ❌ 直接用 Edit/Write 工具修改 \`src/\`、\`lib/\`、\`app/\` 等产品源码
+  // 禁止行为部分
+  const prohibitions = isLightweight
+    ? `1. ❌ 对 P0/bugfix 类需求跳过 "创建 workflow → plan → build/fix" 流程`
+    : `1. ❌ 直接用 Edit/Write 工具修改 \`src/\`、\`lib/\`、\`app/\` 等产品源码
 2. ❌ 在没有调用 codecgc.build/fix 的情况下提交产品代码
-3. ❌ Codex/Gemini 超时后自行编写替代代码（应诊断超时原因或重试）
-4. ❌ 对 P0/bugfix 类需求跳过 "创建 workflow → plan → build/fix" 流程
+3. ❌ ${backendDesc}/${frontendDesc} 超时后自行编写替代代码（应诊断超时原因或重试）
+4. ❌ 对 P0/bugfix 类需求跳过 "创建 workflow → plan → build/fix" 流程`;
 
-## 自检触发条件
-
-当以下条件**全部满足**时，你**必须**先调用 codecgc.entry + codecgc.plan：
-- 用户要求修改产品代码（非 .codecgc/、.claude/、docs/、README）
-- 当前没有活跃的 workflow 覆盖该路径
-
-## 允许直接编辑的路径（白名单）
-
-仅以下路径可由 Claude 直接编辑，无需经过 workflow：
-
-- \`.codecgc/**\` — 工作流配置
-- \`.claude/**\` — Claude 配置
-- \`.mcp.json\` — MCP 配置
-- \`docs/**\` — 文档
-- \`README.md\`、\`CHANGELOG.md\` — 项目说明
-
+  // 超时处理部分
+  const timeoutSection = isLightweight ? `` : `
 ## 超时处理规范
 
-当 Codex 或 Gemini 执行超时时：
+当 ${backendDesc} 或 ${frontendDesc} 执行超时时：
 1. 查看超时日志，分析根因
 2. 调整 timeout_seconds 后重试
-3. **不要**自行编写代码替代——这会破坏工作流闭环
+3. **不要**自行编写代码替代——这会破坏工作流闭环`;
 
-## 首选入口
-
-MCP 可用时优先调用 codecgcmcp 工具：
-
-- \`codecgc.entry\` — 创建 workflow
-- \`codecgc.plan\` — 生成/更新规划
-- \`codecgc.build\` — 执行 feature 步骤
-- \`codecgc.fix\` — 执行 issue 修复
-- \`codecgc.test\` — 执行测试
-- \`codecgc.review\` — 审核执行结果
-- \`codecgc.route\` — 路径归属判断（支持 executor_hint）
-
+  // 混合路由部分
+  const routingSection = isLightweight ? `` : `
 ## 混合路由策略
 
 \`codecgc.route\` 支持三层路由策略（优先级从高到低）：
@@ -426,12 +410,56 @@ MCP 可用时优先调用 codecgcmcp 工具：
 
 ### 3. routing.yaml 规则（兜底）
 
-使用 \`.codecgc/config/routing.yaml\` 的扩展名和路径模式规则。
+使用 \`.codecgc/config/routing.yaml\` 的扩展名和路径模式规则。`;
+
+  return `# CodeCGC 工作流规则
+
+## 工作模式
+
+${isLightweight ? "**轻量模式**：所有代码任务由 Claude 直接处理，无需外部工具。" : `**完全模式**：后端执行器 = ${backendDesc}，前端执行器 = ${frontendDesc}。`}
+
+## 核心分工
+
+${coreRoles}
+
+## 禁止行为（红线）
+
+以下行为会导致工作流断裂、审计缺失、交付质量下降，**绝对不允许**：
+
+${prohibitions}
+
+## 自检触发条件
+
+当以下条件**全部满足**时，你**必须**先调用 codecgc.entry + codecgc.plan：
+- 用户要求修改产品代码（非 .codecgc/、.claude/、docs/、README）
+- 当前没有活跃的 workflow 覆盖该路径
+
+## 允许直接编辑的路径（白名单）
+
+仅以下路径可由 Claude 直接编辑，无需经过 workflow：
+
+- \`.codecgc/**\` — 工作流配置
+- \`.claude/**\` — Claude 配置
+- \`.mcp.json\` — MCP 配置
+- \`docs/**\` — 文档
+- \`README.md\`、\`CHANGELOG.md\` — 项目说明${timeoutSection}
+
+## 首选入口
+
+MCP 可用时优先调用 codecgcmcp 工具：
+
+- \`codecgc.entry\` — 创建 workflow
+- \`codecgc.plan\` — 生成/更新规划
+- \`codecgc.build\` — 执行 feature 步骤
+- \`codecgc.fix\` — 执行 issue 修复
+- \`codecgc.test\` — 执行测试
+- \`codecgc.review\` — 审核执行结果
+- \`codecgc.route\` — 路径归属判断（支持 executor_hint）${routingSection}
 
 ## 标准流程
 
 \`\`\`
-需求 → 规划 → 路由 → Codex/Gemini 执行 → 审计 → Claude 审核 → 关闭
+需求 → 规划 → 路由 → ${isLightweight ? "Claude 执行" : `${backendDesc}/${frontendDesc} 执行`} → 审计 → Claude 审核 → 关闭
 \`\`\`
 `;
 }
