@@ -2,6 +2,31 @@
 
 All notable changes to CodeCGC will be documented in this file.
 
+## [1.0.13] - 2026-05-28
+
+### ✨ Features
+
+#### P0: Executor 配置基础设施
+- **新增**：`src/shared/executor-config.ts` — executors.yaml 配置加载器
+- **新增**：`src/shared/types.ts` — ExecutorConfig、ExecutorMode、ExecutorProvider 类型
+- **新增**：`.codecgc/config/executors.yaml` 配置文件格式
+- **功能**：loadExecutorConfig()、getLightweightModeConfig()、getFullModeConfig()
+
+#### P0: Init 模式选择
+- **新增**：`codecgc.init` 支持 `mode`、`backend`、`frontend` 参数
+- **新增**：自动生成 executors.yaml 和按需生成 .mcp.json
+- **新增**：智能推荐信息（包含安装提示）
+- **模式**：轻量模式（只用 Claude）/ 完全模式（Codex + OpenCode/Gemini）
+
+#### P1: 路由和执行配置感知
+- **新增**：`route.ts` 读取 executors.yaml，轻量模式全部路由到 Claude
+- **新增**：`executor.ts` callExecutor() 根据配置选择执行路径
+- **新增**：callClaudeExecutor() 轻量执行器
+- **新增**：callOpenCodeExecutor() OpenCode 执行器
+- **改进**：route 返回 mode 和 actual_provider 字段
+
+---
+
 ## [1.0.12] - 2026-05-27
 
 ### ✨ Features
