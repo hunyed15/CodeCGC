@@ -1,9 +1,9 @@
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
-import { resolveCliCommand } from "../../../shared/process.js";
-import { resolveProjectRoot, codecgcRoot, routingFile } from "../runtime/paths.js";
 import which from "which";
+import { resolveCliCommand } from "../../../shared/process.js";
+import { codecgcRoot, resolveProjectRoot, routingFile } from "../runtime/paths.js";
 
 export interface DoctorArgs {
   cd?: string;
@@ -210,10 +210,7 @@ async function checkMcpConfig(projectRoot: string): Promise<CheckResult> {
   }
 }
 
-function generateDoctorRecommendation(
-  checks: CheckResult[],
-  overall: DoctorResult["overall"]
-): string {
+function generateDoctorRecommendation(checks: CheckResult[], overall: DoctorResult["overall"]): string {
   if (overall === "healthy") {
     return "环境健康，可以正常使用 CodeCGC 工作流。";
   }

@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
+import { killProcessTree, readlines, resolveCliCommand, tryParseJson, wait } from "../../shared/process.js";
 import type { CodexOptions, ExecutorResult } from "../../shared/types.js";
-import { resolveCliCommand, readlines, tryParseJson, wait, killProcessTree } from "../../shared/process.js";
 
 const DEFAULT_TIMEOUT_MS = 600_000; // 10 分钟
 
@@ -122,14 +122,7 @@ export async function runCodexSession(opts: CodexOptions): Promise<ExecutorResul
  * 构建 Codex CLI 参数
  */
 function buildCodexArgs(opts: CodexOptions): string[] {
-  const args = [
-    "exec",
-    "--sandbox",
-    opts.sandbox ?? "read-only",
-    "--cd",
-    opts.cd,
-    "--json",
-  ];
+  const args = ["exec", "--sandbox", opts.sandbox ?? "read-only", "--cd", opts.cd, "--json"];
 
   if (opts.skipGitRepoCheck) args.push("--skip-git-repo-check");
   if (opts.yolo) args.push("--yolo");

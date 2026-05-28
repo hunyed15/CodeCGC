@@ -1,6 +1,6 @@
 import * as path from "path";
-import { runCodexSession } from "./executor.js";
 import type { BackendTaskOptions, TaskResult } from "../../shared/types.js";
+import { runCodexSession } from "./executor.js";
 
 // 前端路径模式（后端执行器拒绝这些路径）
 const FRONTEND_PATTERNS = [
@@ -15,13 +15,9 @@ const FRONTEND_PATTERNS = [
 ];
 
 function validateBackendPaths(paths: string[]): void {
-  const violations = paths.filter((p) =>
-    FRONTEND_PATTERNS.some((re) => re.test(p.replace(/\\/g, "/")))
-  );
+  const violations = paths.filter((p) => FRONTEND_PATTERNS.some((re) => re.test(p.replace(/\\/g, "/"))));
   if (violations.length > 0) {
-    throw new Error(
-      `后端执行器拒绝以下疑似前端路径：${violations.join(", ")}`
-    );
+    throw new Error(`后端执行器拒绝以下疑似前端路径：${violations.join(", ")}`);
   }
 }
 
@@ -134,7 +130,7 @@ export async function executeBackendTask(opts: BackendTaskOptions): Promise<Task
     sessionId: result.sessionId,
     summary: result.agentMessages,
     agentMessages: result.agentMessages,
-    changedFiles: [],  // 由文件快照层填充（Phase 3）
+    changedFiles: [], // 由文件快照层填充（Phase 3）
     policyChecks,
     risks,
     error: result.error,

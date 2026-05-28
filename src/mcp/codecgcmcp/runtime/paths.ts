@@ -1,6 +1,6 @@
-import { resolve, join, isAbsolute, relative, sep, normalize } from "path";
 import { existsSync } from "fs";
 import { mkdir } from "fs/promises";
+import { isAbsolute, join, normalize, relative, resolve, sep } from "path";
 
 /**
  * 验证 slug 不含路径穿越字符

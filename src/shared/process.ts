@@ -1,8 +1,8 @@
-import { spawn, execFileSync } from "child_process";
-import { createInterface } from "readline";
+import { execFileSync, spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import { Readable } from "stream";
+import { createInterface } from "readline";
+import type { Readable } from "stream";
 import which from "which";
 
 /**

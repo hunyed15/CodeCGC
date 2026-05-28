@@ -1,12 +1,7 @@
 import { readFile } from "fs/promises";
-import {
-  readWorkflow,
-  resolveWorkflowDir,
-  listAudits,
-  listWorkflows,
-} from "../runtime/artifacts.js";
-import { resolveProjectRoot } from "../runtime/paths.js";
 import type { WorkflowKind } from "../../../shared/types.js";
+import { listAudits, listWorkflows, readWorkflow, resolveWorkflowDir } from "../runtime/artifacts.js";
+import { resolveProjectRoot } from "../runtime/paths.js";
 
 export interface HistoryArgs {
   kind?: WorkflowKind;
@@ -73,13 +68,7 @@ export async function history(args: HistoryArgs): Promise<HistoryResult> {
 
     // 模式 2：查询特定 step 的 audits
     if (args.kind && args.slug && args.step_id) {
-      return await queryStepAudits(
-        projectRoot,
-        args.kind,
-        args.slug,
-        args.step_id,
-        args.limit
-      );
+      return await queryStepAudits(projectRoot, args.kind, args.slug, args.step_id, args.limit);
     }
 
     // 模式 3：查询所有 workflows
@@ -101,7 +90,7 @@ async function querySingleWorkflow(
   projectRoot: string,
   kind: WorkflowKind,
   slug: string,
-  limit?: number
+  limit?: number,
 ): Promise<HistoryResult> {
   const workflow = await readWorkflow(projectRoot, kind, slug);
   const dir = resolveWorkflowDir(projectRoot, kind, slug);
@@ -148,7 +137,7 @@ async function queryStepAudits(
   kind: WorkflowKind,
   slug: string,
   stepId: string,
-  limit?: number
+  limit?: number,
 ): Promise<HistoryResult> {
   const workflow = await readWorkflow(projectRoot, kind, slug);
   const dir = resolveWorkflowDir(projectRoot, kind, slug);
@@ -187,14 +176,9 @@ async function queryStepAudits(
 /**
  * 查询所有 workflows 的摘要
  */
-async function queryAllWorkflows(
-  projectRoot: string,
-  kindFilter?: WorkflowKind
-): Promise<HistoryResult> {
+async function queryAllWorkflows(projectRoot: string, kindFilter?: WorkflowKind): Promise<HistoryResult> {
   const allWorkflows = await listWorkflows(projectRoot);
-  const filtered = kindFilter
-    ? allWorkflows.filter((w) => w.kind === kindFilter)
-    : allWorkflows;
+  const filtered = kindFilter ? allWorkflows.filter((w) => w.kind === kindFilter) : allWorkflows;
 
   const summaries: WorkflowSummary[] = [];
   for (const { kind, slug } of filtered) {

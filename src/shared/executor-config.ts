@@ -1,8 +1,8 @@
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
-import yaml from "js-yaml";
 import type { ExecutorConfig } from "./types.js";
+import { parseYaml } from "./yaml.js";
 
 /**
  * 加载 executor 配置
@@ -18,7 +18,7 @@ export async function loadExecutorConfig(projectRoot: string): Promise<ExecutorC
 
   try {
     const content = await readFile(configPath, "utf-8");
-    const config = yaml.load(content) as ExecutorConfig;
+    const config = parseYaml<ExecutorConfig>(content);
 
     // 验证配置结构
     validateExecutorConfig(config);
@@ -77,7 +77,10 @@ export function getLightweightModeConfig(): ExecutorConfig {
 /**
  * 获取完全模式配置模板
  */
-export function getFullModeConfig(backend: "codex" | "claude", frontend: "opencode" | "gemini" | "claude"): ExecutorConfig {
+export function getFullModeConfig(
+  backend: "codex" | "claude",
+  frontend: "opencode" | "gemini" | "claude",
+): ExecutorConfig {
   return {
     version: 1,
     mode: "full",

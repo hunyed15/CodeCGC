@@ -1,5 +1,5 @@
-import { runOpenCodeSession } from "./executor.js";
 import type { FrontendTaskOptions, TaskResult } from "../../shared/types.js";
+import { runOpenCodeSession } from "./executor.js";
 
 /**
  * 前端任务执行器（OpenCode 专用）

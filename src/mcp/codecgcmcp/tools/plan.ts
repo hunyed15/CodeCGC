@@ -1,12 +1,7 @@
-import {
-  readWorkflow,
-  writeWorkflow,
-  addStep,
-  resolveWorkflowDir,
-} from "../runtime/artifacts.js";
+import type { StepExecutor, WorkflowKind, WorkflowStep } from "../../../shared/types.js";
+import { addStep, readWorkflow, resolveWorkflowDir, writeWorkflow } from "../runtime/artifacts.js";
 import { resolveProjectRoot, validateStepPaths } from "../runtime/paths.js";
-import { readRouting, classifyPaths, hasMixedOwnership } from "../runtime/routing.js";
-import type { WorkflowKind, WorkflowStep, StepExecutor } from "../../../shared/types.js";
+import { classifyPaths, hasMixedOwnership, readRouting } from "../runtime/routing.js";
 
 export interface PlanArgs {
   kind: WorkflowKind;
@@ -69,7 +64,7 @@ export async function plan(args: PlanArgs): Promise<PlanResult> {
     const warnings: string[] = [];
 
     // Check for duplicate step IDs
-    const existingIds = new Set(workflow.steps?.map(s => s.id) || []);
+    const existingIds = new Set(workflow.steps?.map((s) => s.id) || []);
     const newIds = new Set<string>();
 
     for (const stepInput of args.steps) {
@@ -123,7 +118,7 @@ export async function plan(args: PlanArgs): Promise<PlanResult> {
       // Validate path ownership
       if (hasMixedOwnership(stepInput.paths, routing)) {
         warnings.push(
-          `Step ${stepInput.id} contains mixed/shared/unknown paths, suggest splitting:\n${stepInput.paths.slice(0, 5).join(", ")}${stepInput.paths.length > 5 ? ` (and ${stepInput.paths.length - 5} more)` : ""}`
+          `Step ${stepInput.id} contains mixed/shared/unknown paths, suggest splitting:\n${stepInput.paths.slice(0, 5).join(", ")}${stepInput.paths.length > 5 ? ` (and ${stepInput.paths.length - 5} more)` : ""}`,
         );
       }
 

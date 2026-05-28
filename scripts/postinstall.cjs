@@ -3,12 +3,13 @@
  * postinstall.cjs
  *
  * 全局安装后自动释放 cgc 和 cgc-init 两个 skill 到 ~/.claude/skills/<name>/SKILL.md
- * 使用户可以在任何项目的 Claude Code 中直接使用 /cgc-init 初始化项目
+ * 并注册 codecgcmcp MCP 服务器到全局 Claude Code 配置
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execSync } = require('child_process');
 
 // 只释放这两个 skill 到全局
 const GLOBAL_SKILLS = ['cgc-init', 'cgc'];
@@ -35,11 +36,18 @@ console.log('[codecgc] global install detected, releasing skills...\n');
 const skillsSourceDir = path.join(__dirname, '..', 'skills');
 const skillsTargetBase = path.join(os.homedir(), '.claude', 'skills');
 
+// 所有可能的旧版 skill 名称（用于清理遗留的扁平文件）
+const LEGACY_SKILLS = [
+  'cgc', 'cgc-init', 'cgc-build', 'cgc-doctor', 'cgc-entry',
+  'cgc-explain', 'cgc-fix', 'cgc-history', 'cgc-plan', 'cgc-review',
+  'cgc-status', 'cgc-test', 'cgc-continue', 'cgc-audit', 'cgc-manual',
+];
+
 try {
   fs.mkdirSync(skillsTargetBase, { recursive: true });
 
   // 清理旧的扁平 .md 文件（之前版本遗留）
-  for (const name of GLOBAL_SKILLS) {
+  for (const name of LEGACY_SKILLS) {
     const oldFlat = path.join(skillsTargetBase, `${name}.md`);
     if (fs.existsSync(oldFlat) && fs.statSync(oldFlat).isFile()) {
       fs.unlinkSync(oldFlat);
@@ -65,6 +73,36 @@ try {
   }
 
   console.log(`\n[codecgc] released ${successCount} skill(s) to ~/.claude/skills/`);
+
+  // 注册 codecgcmcp MCP 服务器到全局 Claude Code 配置
+  const cgcMcpPath = path.join(__dirname, '..', 'bin', 'cgc-mcp.js');
+  try {
+    execSync(
+      `claude mcp add --scope user codecgcmcp node "${cgcMcpPath}" "codecgcmcp"`,
+      { stdio: 'pipe', timeout: 10000 }
+    );
+    console.log('  + registered codecgcmcp MCP server (global)');
+  } catch (mcpErr) {
+    // claude CLI 可能不在 PATH，手动写入 ~/.claude.json
+    const claudeConfigPath = path.join(os.homedir(), '.claude.json');
+    let config = {};
+    if (fs.existsSync(claudeConfigPath)) {
+      try { config = JSON.parse(fs.readFileSync(claudeConfigPath, 'utf-8')); } catch {}
+    }
+    if (!config.mcpServers) config.mcpServers = {};
+    if (!config.mcpServers.codecgcmcp) {
+      config.mcpServers.codecgcmcp = {
+        type: 'stdio',
+        command: 'node',
+        args: [cgcMcpPath, 'codecgcmcp'],
+      };
+      fs.writeFileSync(claudeConfigPath, JSON.stringify(config, null, 2), 'utf-8');
+      console.log('  + registered codecgcmcp MCP server (fallback)');
+    } else {
+      console.log('  ~ codecgcmcp MCP server already registered');
+    }
+  }
+
   console.log('\nAvailable globally in Claude Code:');
   console.log('  /cgc-init  - initialize project');
   console.log('  /cgc       - single entry point\n');

@@ -19,12 +19,16 @@ function tryParseJson(line) {
     const parsed = JSON.parse(line.trim());
     if (typeof parsed === "object" && parsed !== null) return parsed;
     return null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function spawnGemini(opts) {
   const requestId = randomBytes(8).toString("hex");
-  console.error(`[spawnGemini] Starting requestId=${requestId}, cmd=${opts.cmd}, args=${JSON.stringify(opts.args).slice(0, 100)}`);
+  console.error(
+    `[spawnGemini] Starting requestId=${requestId}, cmd=${opts.cmd}, args=${JSON.stringify(opts.args).slice(0, 100)}`,
+  );
 
   const proc = spawn(opts.cmd, opts.args, {
     cwd: opts.cd,
@@ -101,7 +105,11 @@ function spawnGemini(opts) {
             error: errorMessage || undefined,
           });
         }
-        setTimeout(() => { try { proc.kill(); } catch {} }, 300);
+        setTimeout(() => {
+          try {
+            proc.kill();
+          } catch {}
+        }, 300);
       }
     }
   });
@@ -112,7 +120,9 @@ function spawnGemini(opts) {
   });
 
   proc.on("exit", () => {
-    console.error(`[spawnGemini] Process exited, requestId=${requestId}, resolved=${resolved}, sessionId=${sessionId}, stderr=${stderrOutput.slice(0, 100)}`);
+    console.error(
+      `[spawnGemini] Process exited, requestId=${requestId}, resolved=${resolved}, sessionId=${sessionId}, stderr=${stderrOutput.slice(0, 100)}`,
+    );
     if (resolved) return;
     resolved = true;
     clearTimeout(timeout);
@@ -142,7 +152,9 @@ function spawnGemini(opts) {
 const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/execute") {
     let body = "";
-    req.on("data", chunk => { body += chunk.toString(); });
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
     req.on("end", () => {
       try {
         const opts = JSON.parse(body);

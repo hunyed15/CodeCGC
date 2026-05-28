@@ -1,7 +1,10 @@
 import { spawn } from "child_process";
 import * as path from "path";
-import type { GeminiOptions, ExecutorResult } from "../../shared/types.js";
-import { resolveCliCommand, readlines, tryParseJson, wait, killProcessTree } from "../../shared/process.js";
+import { createDebugLogger } from "../../shared/debug.js";
+import { killProcessTree, readlines, resolveCliCommand, tryParseJson, wait } from "../../shared/process.js";
+import type { ExecutorResult, GeminiOptions } from "../../shared/types.js";
+
+const debug = createDebugLogger("geminimcp");
 
 const DEFAULT_TIMEOUT_MS = 600_000;
 
@@ -25,8 +28,8 @@ export async function runGeminiSession(opts: GeminiOptions): Promise<ExecutorRes
     throw new Error("timeoutMs must be between 1 and 3600000 (1 hour)");
   }
 
-  console.error("[geminimcp] spawn:", cmd[0], cmd.slice(1).concat(args).join(" ").slice(0, 200));
-  console.error("[geminimcp] cwd:", opts.cd);
+  debug.log("spawn:", cmd[0], cmd.slice(1).concat(args).join(" ").slice(0, 200));
+  debug.log("cwd:", opts.cd);
 
   const proc = spawn(cmd[0], [...cmd.slice(1), ...args], {
     cwd: opts.cd,
@@ -39,13 +42,13 @@ export async function runGeminiSession(opts: GeminiOptions): Promise<ExecutorRes
     windowsHide: true,
   });
 
-  console.error("[geminimcp] PID:", proc.pid);
+  debug.log("PID:", proc.pid);
 
   // 调试：监听 stderr 看 Gemini 是否把 JSON 输出到了 stderr
   proc.stderr?.on("data", (chunk) => {
     const text = chunk.toString();
     if (text.includes('"type"')) {
-      console.error("[geminimcp] JSON ON STDERR!");
+      debug.warn("JSON ON STDERR!");
     }
   });
 
@@ -67,11 +70,11 @@ export async function runGeminiSession(opts: GeminiOptions): Promise<ExecutorRes
       lineCount++;
       const event = tryParseJson(line);
       if (!event) {
-        console.error("[geminimcp] non-json line:", line.slice(0, 100));
+        debug.log("non-json line:", line.slice(0, 100));
         continue;
       }
 
-      console.error("[geminimcp] event type:", event.type);
+      debug.log("event type:", event.type);
       if (!event) continue;
 
       if (opts.returnAllMessages) allMessages.push(event);
@@ -82,11 +85,7 @@ export async function runGeminiSession(opts: GeminiOptions): Promise<ExecutorRes
       }
 
       // 提取 assistant 消息
-      if (
-        event.type === "message" &&
-        event.role === "assistant" &&
-        typeof event.content === "string"
-      ) {
+      if (event.type === "message" && event.role === "assistant" && typeof event.content === "string") {
         agentMessages += event.content;
       }
 

@@ -1,8 +1,8 @@
 import { existsSync } from "fs";
-import { readYaml } from "../../../shared/yaml.js";
-import type { ModelRouting, PathOwnership, RoutingRule } from "../../../shared/types.js";
-import { routingFile } from "./paths.js";
 import { minimatch } from "minimatch";
+import type { ModelRouting, PathOwnership, RoutingRule } from "../../../shared/types.js";
+import { readYaml } from "../../../shared/yaml.js";
+import { routingFile } from "./paths.js";
 
 /**
  * 默认路由规则（当 .codecgc/config/routing.yaml 不存在时）
@@ -71,10 +71,7 @@ export function classifyPath(path: string, routing: ModelRouting): PathOwnership
 /**
  * 批量分类路径
  */
-export function classifyPaths(
-  paths: string[],
-  routing: ModelRouting
-): Map<PathOwnership, string[]> {
+export function classifyPaths(paths: string[], routing: ModelRouting): Map<PathOwnership, string[]> {
   const result = new Map<PathOwnership, string[]>();
   for (const path of paths) {
     const ownership = classifyPath(path, routing);
@@ -89,11 +86,7 @@ export function classifyPaths(
  */
 export function isPureBackend(paths: string[], routing: ModelRouting): boolean {
   const classified = classifyPaths(paths, routing);
-  return (
-    classified.size === 1 &&
-    classified.has("backend") &&
-    classified.get("backend")!.length === paths.length
-  );
+  return classified.size === 1 && classified.has("backend") && classified.get("backend")!.length === paths.length;
 }
 
 /**
@@ -101,11 +94,7 @@ export function isPureBackend(paths: string[], routing: ModelRouting): boolean {
  */
 export function isPureFrontend(paths: string[], routing: ModelRouting): boolean {
   const classified = classifyPaths(paths, routing);
-  return (
-    classified.size === 1 &&
-    classified.has("frontend") &&
-    classified.get("frontend")!.length === paths.length
-  );
+  return classified.size === 1 && classified.has("frontend") && classified.get("frontend")!.length === paths.length;
 }
 
 /**
@@ -113,11 +102,7 @@ export function isPureFrontend(paths: string[], routing: ModelRouting): boolean 
  */
 export function isPureDocs(paths: string[], routing: ModelRouting): boolean {
   const classified = classifyPaths(paths, routing);
-  return (
-    classified.size === 1 &&
-    classified.has("docs") &&
-    classified.get("docs")!.length === paths.length
-  );
+  return classified.size === 1 && classified.has("docs") && classified.get("docs")!.length === paths.length;
 }
 
 /**

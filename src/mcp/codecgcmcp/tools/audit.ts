@@ -1,13 +1,13 @@
-import {
-  listWorkflows,
-  readWorkflow,
-  inferWorkflowState,
-  resolveWorkflowDir,
-  listAudits,
-} from "../runtime/artifacts.js";
-import { resolveProjectRoot } from "../runtime/paths.js";
 import { readFile } from "fs/promises";
 import type { WorkflowKind } from "../../../shared/types.js";
+import {
+  inferWorkflowState,
+  listAudits,
+  listWorkflows,
+  readWorkflow,
+  resolveWorkflowDir,
+} from "../runtime/artifacts.js";
+import { resolveProjectRoot } from "../runtime/paths.js";
 
 export interface AuditArgs {
   cd?: string;
@@ -130,7 +130,9 @@ export async function audit(args: AuditArgs): Promise<AuditResult> {
                     latestExecAudit = sortedAudits[i];
                     break;
                   }
-                } catch { /* skip */ }
+                } catch {
+                  /* skip */
+                }
               }
               if (latestExecAudit) {
                 const auditAge = await getFileAgeDays(latestExecAudit);

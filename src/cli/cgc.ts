@@ -1,19 +1,16 @@
 #!/usr/bin/env node
-import { Command } from "commander";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { fileURLToPath } from "url";
+import { Command } from "commander";
 import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const program = new Command();
 
-program
-  .name("cgc")
-  .description("CodeCGC 多模型工作流编排 CLI")
-  .version("0.7.0");
+program.name("cgc").description("CodeCGC 多模型工作流编排 CLI").version("0.7.0");
 
 // ==================== 辅助函数 ====================
 
@@ -25,10 +22,7 @@ async function callMcpTool(toolName: string, args: Record<string, unknown>): Pro
     args: [serverPath],
   });
 
-  const client = new Client(
-    { name: "cgc-cli", version: "0.1.0" },
-    { capabilities: {} }
-  );
+  const client = new Client({ name: "cgc-cli", version: "0.1.0" }, { capabilities: {} });
 
   // 从 args 中提取超时（如果有），CLI → codecgcmcp 层的超时应大于内层超时
   const innerTimeout = (args.timeout_seconds as number) || 900;
@@ -37,24 +31,20 @@ async function callMcpTool(toolName: string, args: Record<string, unknown>): Pro
   try {
     await client.connect(transport);
 
-    const result = await client.callTool(
-      { name: toolName, arguments: args },
-      undefined,
-      { timeout: clientTimeout }
-    );
-    const resultAny = result as any;
-    if (!resultAny.content || resultAny.content.length === 0) {
+    const result = await client.callTool({ name: toolName, arguments: args }, undefined, { timeout: clientTimeout });
+    const resultContent = result as { content?: Array<{ type: string; text?: string }> };
+    if (!resultContent.content || resultContent.content.length === 0) {
       console.error("MCP 返回空内容");
       process.exit(1);
     }
 
-    const content = resultAny.content[0];
+    const content = resultContent.content[0];
     if (content.type !== "text" || !content.text) {
       console.error("MCP 返回非文本内容");
       process.exit(1);
     }
 
-    let data: any;
+    let data: unknown;
     try {
       data = JSON.parse(content.text);
     } catch {
@@ -63,7 +53,7 @@ async function callMcpTool(toolName: string, args: Record<string, unknown>): Pro
     }
     console.log(JSON.stringify(data, null, 2));
 
-    if (!data.success) {
+    if (typeof data === "object" && data !== null && "success" in data && !(data as { success?: boolean }).success) {
       process.exit(1);
     }
   } catch (error) {
@@ -215,9 +205,7 @@ program
   .option("--notes <text>", "备注")
   .option("--cd <dir>", "项目根目录", process.cwd())
   .action(async (kind, slug, stepId, options) => {
-    const changedFiles = options.changedFiles
-      ? options.changedFiles.split(",").map((f: string) => f.trim())
-      : [];
+    const changedFiles = options.changedFiles ? options.changedFiles.split(",").map((f: string) => f.trim()) : [];
     await callMcpTool("codecgc.manual", {
       kind,
       slug,
@@ -300,7 +288,9 @@ program
 
 program
   .command("review <kind> <slug> <step-id> [decision]")
-  .description("审核步骤执行结果。不传 decision = prepare 模式（返回审核请求包）；传 decision = 写入决定（approved/changes-requested/rejected/reopen）")
+  .description(
+    "审核步骤执行结果。不传 decision = prepare 模式（返回审核请求包）；传 decision = 写入决定（approved/changes-requested/rejected/reopen）",
+  )
   .option("--notes <text>", "审核备注")
   .option("--issues <json>", "问题清单（JSON 数组）")
   .option("--suggestions <json>", "改进建议（JSON 数组）")

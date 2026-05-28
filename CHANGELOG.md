@@ -2,6 +2,21 @@
 
 All notable changes to CodeCGC will be documented in this file.
 
+## [1.0.15] - Unreleased
+
+### 🔧 Engineering
+- **安全**：修复 executor-config.ts YAML schema 不一致漏洞（统一使用 safe schema）
+- **工程化**：添加 GitHub Actions CI workflow（PR 触发 build + test）
+- **工程化**：publish.yml 增加 npm test gate（零测试无法发版）
+- **工程化**：引入 Biome 用于代码检查和格式化
+- **类型安全**：替换 `as any` 类型断言为显式类型守卫
+- **安全**：调试日志抽取到 DEBUG 环境变量后面（DEBUG=codecgc 启用）
+- **治理**：添加 SECURITY.md（威胁模型与披露渠道）
+- **治理**：添加 CODEOWNERS
+- **测试**：启用 test/ 目录，添加 paths.test.ts、executor-config.test.ts（23 个测试用例）
+
+---
+
 ## [1.0.14] - 2026-05-28
 
 ### 📝 Docs
@@ -92,6 +107,20 @@ All notable changes to CodeCGC will be documented in this file.
 
 ### 📝 Docs
 - README、`skills/cgc.md`、`skills/cgc-init.md`、`skills/cgc-doctor.md` 中 `codecgc/` → `.codecgc/`，与代码实际行为对齐
+
+---
+
+## [1.0.0] - 2026-05-25
+
+### ✨ First Stable Release
+
+- 🎉 **正式版发布**：CodeCGC 多模型工作流编排器
+- **架构**：纯 TypeScript 重写，消除 Python 依赖
+- **MCP 架构**：codecgcmcp + codexmcp + geminimcp 三服务器
+- **双路由策略**：HTTP 优先 + Stdio fallback
+- **完整工具集**：15 个工具（7 核心工作流 + 3 决策辅助 + 4 项目治理 + 1 审计）
+- **安全加固**：路径穿越防护、并发锁、YAML 安全 schema、输入大小限制
+- **文档**：README、CHANGELOG、skills 文档完整
 
 ---
 

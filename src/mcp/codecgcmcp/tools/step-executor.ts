@@ -1,17 +1,11 @@
-import {
-  readWorkflow,
-  writeWorkflow,
-  nextPendingStep,
-  resolveWorkflowDir,
-  writeAudit,
-} from "../runtime/artifacts.js";
-import { resolveProjectRoot, validateStepPaths } from "../runtime/paths.js";
-import { callExecutor } from "../runtime/executor.js";
-import { readRouting, classifyPaths } from "../runtime/routing.js";
 import { loadExecutorConfig } from "../../../shared/executor-config.js";
+import type { WorkflowKind } from "../../../shared/types.js";
+import { nextPendingStep, readWorkflow, resolveWorkflowDir, writeAudit, writeWorkflow } from "../runtime/artifacts.js";
+import { callExecutor } from "../runtime/executor.js";
+import { resolveProjectRoot, validateStepPaths } from "../runtime/paths.js";
+import { classifyPaths, readRouting } from "../runtime/routing.js";
 import { autoCollectReviewContext } from "./auto-review.js";
 import type { ReviewRequest } from "./review.js";
-import type { WorkflowKind } from "../../../shared/types.js";
 
 export interface StepExecArgs {
   kind: WorkflowKind;
@@ -41,10 +35,7 @@ export interface StepExecResult {
 /**
  * build/fix 共享的执行逻辑
  */
-export async function executeStep(
-  args: StepExecArgs,
-  expectedKind: WorkflowKind,
-): Promise<StepExecResult> {
+export async function executeStep(args: StepExecArgs, expectedKind: WorkflowKind): Promise<StepExecResult> {
   try {
     if (!args.kind || !args.slug) {
       throw new Error("kind and slug are required");
@@ -67,14 +58,10 @@ export async function executeStep(
       throw new Error("workflow has no steps");
     }
 
-    const step = args.step_id
-      ? workflow.steps.find((s) => s.id === args.step_id)
-      : nextPendingStep(workflow, true);
+    const step = args.step_id ? workflow.steps.find((s) => s.id === args.step_id) : nextPendingStep(workflow, true);
 
     if (!step) {
-      throw new Error(
-        args.step_id ? `Step not found: ${args.step_id}` : "No pending steps"
-      );
+      throw new Error(args.step_id ? `Step not found: ${args.step_id}` : "No pending steps");
     }
 
     if (step.status !== "pending") {
@@ -86,9 +73,7 @@ export async function executeStep(
 
     // 完全模式下，docs/orchestration 步骤应使用 codecgc.manual 工具
     if (executorConfig.mode === "full" && (step.executor === "docs" || step.executor === "orchestration")) {
-      throw new Error(
-        `Step ${step.id} executor is ${step.executor}, should use codecgc.manual tool to mark as done`
-      );
+      throw new Error(`Step ${step.id} executor is ${step.executor}, should use codecgc.manual tool to mark as done`);
     }
 
     // 防御性检查：拒绝 ../ 和绝对路径
@@ -101,13 +86,13 @@ export async function executeStep(
       if (step.executor === "backend" && classified.has("frontend")) {
         const frontendPaths = classified.get("frontend") || [];
         throw new Error(
-          `Backend step ${step.id} contains frontend paths: ${frontendPaths.slice(0, 3).join(", ")}${frontendPaths.length > 3 ? ` (and ${frontendPaths.length - 3} more)` : ""}`
+          `Backend step ${step.id} contains frontend paths: ${frontendPaths.slice(0, 3).join(", ")}${frontendPaths.length > 3 ? ` (and ${frontendPaths.length - 3} more)` : ""}`,
         );
       }
       if (step.executor === "frontend" && classified.has("backend")) {
         const backendPaths = classified.get("backend") || [];
         throw new Error(
-          `Frontend step ${step.id} contains backend paths: ${backendPaths.slice(0, 3).join(", ")}${backendPaths.length > 3 ? ` (and ${backendPaths.length - 3} more)` : ""}`
+          `Frontend step ${step.id} contains backend paths: ${backendPaths.slice(0, 3).join(", ")}${backendPaths.length > 3 ? ` (and ${backendPaths.length - 3} more)` : ""}`,
         );
       }
     }

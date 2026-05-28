@@ -1,12 +1,12 @@
 import { existsSync, readdirSync } from "fs";
-import { writeFile, readFile } from "fs/promises";
-import { join, dirname } from "path";
+import { readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
+import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { resolveProjectRoot, codecgcRoot, routingFile, ensureDir } from "../runtime/paths.js";
-import { writeYaml } from "../../../shared/yaml.js";
-import { getLightweightModeConfig, getFullModeConfig } from "../../../shared/executor-config.js";
+import { getFullModeConfig, getLightweightModeConfig } from "../../../shared/executor-config.js";
 import type { ExecutorConfig } from "../../../shared/types.js";
+import { writeYaml } from "../../../shared/yaml.js";
+import { codecgcRoot, ensureDir, resolveProjectRoot, routingFile } from "../runtime/paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -78,9 +78,10 @@ export async function init(args: InitArgs): Promise<InitResult> {
     const executorsPath = join(root, "config", "executors.yaml");
     if (!existsSync(executorsPath) || force) {
       await ensureDir(join(root, "config"));
-      const executorConfig: ExecutorConfig = mode === "lightweight"
-        ? getLightweightModeConfig()
-        : getFullModeConfig(backend as "codex" | "claude", frontend as "opencode" | "gemini" | "claude");
+      const executorConfig: ExecutorConfig =
+        mode === "lightweight"
+          ? getLightweightModeConfig()
+          : getFullModeConfig(backend as "codex" | "claude", frontend as "opencode" | "gemini" | "claude");
       await writeYaml(executorsPath, executorConfig);
       created.push(".codecgc/config/executors.yaml");
     } else {
@@ -114,11 +115,7 @@ export async function init(args: InitArgs): Promise<InitResult> {
     if (existsSync(gitignorePath)) {
       const content = await readFile(gitignorePath, "utf-8");
       if (!content.includes(gitignoreRule)) {
-        await writeFile(
-          gitignorePath,
-          content + `\n# CodeCGC\n${gitignoreRule}\n`,
-          "utf-8"
-        );
+        await writeFile(gitignorePath, content + `\n# CodeCGC\n${gitignoreRule}\n`, "utf-8");
         created.push(".gitignore (追加 CodeCGC 规则)");
       } else {
         skipped.push(".gitignore (已包含规则)");
@@ -176,9 +173,8 @@ export async function init(args: InitArgs): Promise<InitResult> {
         if (frontend === "opencode") installHints.push("npm install -g @opencode-ai/opencode");
       }
 
-      const installMsg = installHints.length > 0
-        ? `\n\n需要安装执行器：\n${installHints.map(h => `  ${h}`).join("\n")}`
-        : "";
+      const installMsg =
+        installHints.length > 0 ? `\n\n需要安装执行器：\n${installHints.map((h) => `  ${h}`).join("\n")}` : "";
 
       recommendation = `已创建 ${totalCreated} 项。${skillSummary}\n\n工作模式：${modeDesc}${installMsg}\n\n下一步：调用 codecgc.entry 创建第一个 workflow。`;
     }
@@ -222,9 +218,16 @@ function getDefaultRouting() {
       },
       {
         patterns: [
-          "**/*.tsx", "**/*.jsx", "**/*.vue", "**/*.svelte",
-          "**/*.css", "**/*.scss",
-          "**/components/**", "**/pages/**", "**/app/**", "**/frontend/**",
+          "**/*.tsx",
+          "**/*.jsx",
+          "**/*.vue",
+          "**/*.svelte",
+          "**/*.css",
+          "**/*.scss",
+          "**/components/**",
+          "**/pages/**",
+          "**/app/**",
+          "**/frontend/**",
         ],
         ownership: "frontend",
       },
@@ -269,7 +272,7 @@ function getDefaultMcpConfig() {
 function generateMcpConfig(
   mode: "lightweight" | "full",
   backend: string,
-  frontend: string
+  frontend: string,
 ): { mcpServers: Record<string, { command: string; args: string[] }> } {
   const mcpServers: Record<string, { command: string; args: string[] }> = {
     codecgc: {
@@ -328,7 +331,7 @@ async function releaseProjectSkills(projectRoot: string, force: boolean): Promis
     return result;
   }
 
-  const files = readdirSync(skillsSourceDir).filter(f => f.endsWith(".md"));
+  const files = readdirSync(skillsSourceDir).filter((f) => f.endsWith(".md"));
 
   for (const file of files) {
     const name = file.replace(/\.md$/, "");
@@ -354,7 +357,7 @@ async function releaseProjectSkills(projectRoot: string, force: boolean): Promis
 function getDefaultClaudeMd(
   mode: "lightweight" | "full" = "lightweight",
   backend: string = "claude",
-  frontend: string = "claude"
+  frontend: string = "claude",
 ): string {
   const isLightweight = mode === "lightweight";
 
@@ -379,7 +382,9 @@ function getDefaultClaudeMd(
 4. ❌ 对 P0/bugfix 类需求跳过 "创建 workflow → plan → build/fix" 流程`;
 
   // 超时处理部分
-  const timeoutSection = isLightweight ? `` : `
+  const timeoutSection = isLightweight
+    ? ``
+    : `
 ## 超时处理规范
 
 当 ${backendDesc} 或 ${frontendDesc} 执行超时时：
@@ -388,7 +393,9 @@ function getDefaultClaudeMd(
 3. **不要**自行编写代码替代——这会破坏工作流闭环`;
 
   // 混合路由部分
-  const routingSection = isLightweight ? `` : `
+  const routingSection = isLightweight
+    ? ``
+    : `
 ## 混合路由策略
 
 \`codecgc.route\` 支持三层路由策略（优先级从高到低）：
@@ -507,7 +514,8 @@ metadata:
  * 如果 MEMORY.md 不存在则创建；已包含则跳过
  */
 async function updateMemoryIndex(indexPath: string): Promise<void> {
-  const entry = "- [CodeCGC 工作流强制执行](codecgc-workflow-enforcement.md) — 产品代码修改必须走 workflow，禁止直接 Edit/Write";
+  const entry =
+    "- [CodeCGC 工作流强制执行](codecgc-workflow-enforcement.md) — 产品代码修改必须走 workflow，禁止直接 Edit/Write";
 
   if (existsSync(indexPath)) {
     const content = await readFile(indexPath, "utf-8");

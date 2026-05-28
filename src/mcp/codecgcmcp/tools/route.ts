@@ -1,11 +1,7 @@
-import {
-  readRouting,
-  classifyPaths,
-  hasMixedOwnership,
-} from "../runtime/routing.js";
-import { resolveProjectRoot } from "../runtime/paths.js";
 import { loadExecutorConfig } from "../../../shared/executor-config.js";
 import type { PathOwnership, StepExecutor } from "../../../shared/types.js";
+import { resolveProjectRoot } from "../runtime/paths.js";
+import { classifyPaths, hasMixedOwnership, readRouting } from "../runtime/routing.js";
 
 export interface RouteArgs {
   paths: string[];
@@ -178,15 +174,17 @@ export async function route(args: RouteArgs): Promise<RouteResult> {
 
     // Limit output length to prevent excessive strings
     if (sharedPaths.length > 0) {
-      const pathList = sharedPaths.length > 5
-        ? `${sharedPaths.slice(0, 5).join(", ")} (and ${sharedPaths.length - 5} more)`
-        : sharedPaths.join(", ");
+      const pathList =
+        sharedPaths.length > 5
+          ? `${sharedPaths.slice(0, 5).join(", ")} (and ${sharedPaths.length - 5} more)`
+          : sharedPaths.join(", ");
       recommendation += ` Shared paths need clarification: ${pathList}`;
     }
     if (unknownPaths.length > 0) {
-      const pathList = unknownPaths.length > 5
-        ? `${unknownPaths.slice(0, 5).join(", ")} (and ${unknownPaths.length - 5} more)`
-        : unknownPaths.join(", ");
+      const pathList =
+        unknownPaths.length > 5
+          ? `${unknownPaths.slice(0, 5).join(", ")} (and ${unknownPaths.length - 5} more)`
+          : unknownPaths.join(", ");
       recommendation += ` Unknown paths need routing.yaml update: ${pathList}`;
     }
 
@@ -238,7 +236,10 @@ function ownershipToExecutor(ownership: PathOwnership): StepExecutor {
 /**
  * 根据 executor 类型和配置返回实际 provider 名称
  */
-function resolveProvider(executor: StepExecutor, config: { executors: { backend: { provider: string }; frontend: { provider: string } } }): string {
+function resolveProvider(
+  executor: StepExecutor,
+  config: { executors: { backend: { provider: string }; frontend: { provider: string } } },
+): string {
   switch (executor) {
     case "backend":
       return config.executors.backend.provider;
@@ -264,7 +265,7 @@ function hintToExecutor(hint: "frontend" | "backend" | "docs"): StepExecutor {
  */
 function buildClassificationFromHint(
   paths: string[],
-  hint: "frontend" | "backend" | "docs"
+  hint: "frontend" | "backend" | "docs",
 ): Record<PathOwnership, string[]> {
   const classification: Record<PathOwnership, string[]> = {
     backend: [],
@@ -280,10 +281,7 @@ function buildClassificationFromHint(
 /**
  * Handle executor_hint="both" case (both frontend and backend need changes)
  */
-async function handleBothHint(
-  paths: string[],
-  projectRoot: string
-): Promise<RouteResult> {
+async function handleBothHint(paths: string[], projectRoot: string): Promise<RouteResult> {
   // Use directory convention + routing.yaml for auto-split
   const routing = await readRouting(projectRoot);
   const classified = classifyPaths(paths, routing);
@@ -312,15 +310,17 @@ async function handleBothHint(
   if (splits.length === 0) {
     let recommendation = `Cannot auto-split with executor_hint="both": all paths are shared/unknown.`;
     if (classification.shared.length > 0) {
-      const pathList = classification.shared.length > 5
-        ? `${classification.shared.slice(0, 5).join(", ")} (and ${classification.shared.length - 5} more)`
-        : classification.shared.join(", ");
+      const pathList =
+        classification.shared.length > 5
+          ? `${classification.shared.slice(0, 5).join(", ")} (and ${classification.shared.length - 5} more)`
+          : classification.shared.join(", ");
       recommendation += ` Shared paths need clarification: ${pathList}`;
     }
     if (classification.unknown.length > 0) {
-      const pathList = classification.unknown.length > 5
-        ? `${classification.unknown.slice(0, 5).join(", ")} (and ${classification.unknown.length - 5} more)`
-        : classification.unknown.join(", ");
+      const pathList =
+        classification.unknown.length > 5
+          ? `${classification.unknown.slice(0, 5).join(", ")} (and ${classification.unknown.length - 5} more)`
+          : classification.unknown.join(", ");
       recommendation += ` Unknown paths need routing.yaml update: ${pathList}`;
     }
     return {
@@ -335,15 +335,17 @@ async function handleBothHint(
 
   let recommendation = `Based on executor_hint="both", auto-split into ${splits.length} steps.`;
   if (classification.shared.length > 0) {
-    const pathList = classification.shared.length > 5
-      ? `${classification.shared.slice(0, 5).join(", ")} (and ${classification.shared.length - 5} more)`
-      : classification.shared.join(", ");
+    const pathList =
+      classification.shared.length > 5
+        ? `${classification.shared.slice(0, 5).join(", ")} (and ${classification.shared.length - 5} more)`
+        : classification.shared.join(", ");
     recommendation += ` Shared paths need clarification: ${pathList}`;
   }
   if (classification.unknown.length > 0) {
-    const pathList = classification.unknown.length > 5
-      ? `${classification.unknown.slice(0, 5).join(", ")} (and ${classification.unknown.length - 5} more)`
-      : classification.unknown.join(", ");
+    const pathList =
+      classification.unknown.length > 5
+        ? `${classification.unknown.slice(0, 5).join(", ")} (and ${classification.unknown.length - 5} more)`
+        : classification.unknown.join(", ");
     recommendation += ` Unknown paths need routing.yaml update: ${pathList}`;
   }
 

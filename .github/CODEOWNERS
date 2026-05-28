@@ -1,0 +1,25 @@
+# Default code owners for the repository
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners (fallback for all files)
+* @hunyed15
+
+# Core MCP server and runtime
+src/mcp/codecgcmcp/ @hunyed15
+src/mcp/codexmcp/ @hunyed15
+src/mcp/geminimcp/ @hunyed15
+src/mcp/opencodemcp/ @hunyed15
+
+# Shared utilities
+src/shared/ @hunyed15
+
+# CLI entry points
+src/cli/ @hunyed15
+bin/ @hunyed15
+
+# Build and CI configuration
+*.json @hunyed15
+.github/ @hunyed15
+
+# Documentation
+*.md @hunyed15

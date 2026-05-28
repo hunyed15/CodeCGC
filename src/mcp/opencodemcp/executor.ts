@@ -1,6 +1,9 @@
 import { spawn } from "child_process";
-import type { OpenCodeOptions, ExecutorResult } from "../../shared/types.js";
-import { resolveCliCommand, readlines, tryParseJson, wait, killProcessTree } from "../../shared/process.js";
+import { createDebugLogger } from "../../shared/debug.js";
+import { killProcessTree, readlines, resolveCliCommand, tryParseJson, wait } from "../../shared/process.js";
+import type { ExecutorResult, OpenCodeOptions } from "../../shared/types.js";
+
+const debug = createDebugLogger("opencodemcp");
 
 const DEFAULT_TIMEOUT_MS = 600_000; // 10 分钟
 
@@ -27,8 +30,8 @@ export async function runOpenCodeSession(opts: OpenCodeOptions): Promise<Executo
     throw new Error("timeoutMs must be between 1 and 3600000 (1 hour)");
   }
 
-  console.error("[opencodemcp] spawn:", cmd[0], cmd.slice(1).concat(args).join(" ").slice(0, 200));
-  console.error("[opencodemcp] cwd:", opts.cd);
+  debug.log("spawn:", cmd[0], cmd.slice(1).concat(args).join(" ").slice(0, 200));
+  debug.log("cwd:", opts.cd);
 
   const proc = spawn(cmd[0], [...cmd.slice(1), ...args], {
     cwd: opts.cd,
@@ -40,13 +43,13 @@ export async function runOpenCodeSession(opts: OpenCodeOptions): Promise<Executo
     windowsHide: true,
   });
 
-  console.error("[opencodemcp] PID:", proc.pid);
+  debug.log("PID:", proc.pid);
 
   // 调试：监听 stderr
   proc.stderr?.on("data", (chunk) => {
     const text = chunk.toString();
     if (text.includes('"type"')) {
-      console.error("[opencodemcp] JSON ON STDERR!");
+      debug.warn("JSON ON STDERR!");
     }
   });
 
@@ -68,11 +71,11 @@ export async function runOpenCodeSession(opts: OpenCodeOptions): Promise<Executo
       lineCount++;
       const event = tryParseJson(line);
       if (!event) {
-        console.error("[opencodemcp] non-json line:", line.slice(0, 100));
+        debug.log("non-json line:", line.slice(0, 100));
         continue;
       }
 
-      console.error("[opencodemcp] event type:", event.type);
+      debug.log("event type:", event.type);
 
       if (opts.returnAllMessages) allMessages.push(event);
 
@@ -85,11 +88,7 @@ export async function runOpenCodeSession(opts: OpenCodeOptions): Promise<Executo
       }
 
       // 提取 assistant 消息（支持多种格式）
-      if (
-        event.type === "message" &&
-        event.role === "assistant" &&
-        typeof event.content === "string"
-      ) {
+      if (event.type === "message" && event.role === "assistant" && typeof event.content === "string") {
         agentMessages += event.content;
       }
       // Codex 格式
@@ -152,7 +151,7 @@ export async function runOpenCodeSession(opts: OpenCodeOptions): Promise<Executo
  */
 function buildOpenCodeArgs(opts: OpenCodeOptions): string[] {
   const args = [
-    "--json",  // 假设 OpenCode 支持 JSON 输出
+    "--json", // 假设 OpenCode 支持 JSON 输出
     "--prompt",
     opts.prompt,
   ];

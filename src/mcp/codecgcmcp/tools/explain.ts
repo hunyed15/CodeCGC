@@ -1,12 +1,12 @@
+import type { WorkflowKind } from "../../../shared/types.js";
 import {
-  readWorkflow,
   inferWorkflowState,
-  nextPendingStep,
-  resolveWorkflowDir,
   listAudits,
+  nextPendingStep,
+  readWorkflow,
+  resolveWorkflowDir,
 } from "../runtime/artifacts.js";
 import { resolveProjectRoot } from "../runtime/paths.js";
-import type { WorkflowKind } from "../../../shared/types.js";
 
 export interface ExplainArgs {
   kind: WorkflowKind;
@@ -69,11 +69,7 @@ export async function explain(args: ExplainArgs): Promise<ExplainResult> {
       };
     }
 
-    const { nextAction, recommendation } = generateRecommendation(
-      state,
-      workflow.kind,
-      nextStepInfo
-    );
+    const { nextAction, recommendation } = generateRecommendation(state, workflow.kind, nextStepInfo);
 
     return {
       success: true,
@@ -109,7 +105,7 @@ export async function explain(args: ExplainArgs): Promise<ExplainResult> {
 function generateRecommendation(
   state: string,
   kind: WorkflowKind,
-  nextStep?: { id: string; title: string; executor: string; has_audit: boolean }
+  nextStep?: { id: string; title: string; executor: string; has_audit: boolean },
 ): { nextAction: string; recommendation: string } {
   switch (state) {
     case "needs-planning":

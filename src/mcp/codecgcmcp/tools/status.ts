@@ -1,12 +1,12 @@
+import type { WorkflowKind } from "../../../shared/types.js";
 import {
+  inferWorkflowState,
+  listAudits,
   listWorkflows,
   readWorkflow,
-  inferWorkflowState,
   resolveWorkflowDir,
-  listAudits,
 } from "../runtime/artifacts.js";
 import { resolveProjectRoot } from "../runtime/paths.js";
-import type { WorkflowKind } from "../../../shared/types.js";
 
 export interface StatusArgs {
   cd?: string;
@@ -143,7 +143,5 @@ function generateStatusRecommendation(entries: WorkflowStatusEntry[]): string {
     parts.push(`${needsPlanning.length} 个待规划`);
   }
 
-  return parts.length > 0
-    ? parts.join("；")
-    : "所有 workflow 已关闭。";
+  return parts.length > 0 ? parts.join("；") : "所有 workflow 已关闭。";
 }

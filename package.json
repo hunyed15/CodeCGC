@@ -1,6 +1,6 @@
 {
   "name": "@hunyed15/codecgc",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "CodeCGC — multi-model workflow orchestration for AI-assisted development",
   "type": "module",
   "license": "MIT",
@@ -24,6 +24,8 @@
   "scripts": {
     "build": "tsc && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/cli-worker.cjs','dist/mcp/codecgcmcp/runtime/cli-worker.cjs')\" && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/gemini-worker-thread.cjs','dist/mcp/codecgcmcp/runtime/gemini-worker-thread.cjs')\" && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/cli-http-service.cjs','dist/mcp/codecgcmcp/runtime/cli-http-service.cjs')\" && node -e \"require('fs').copyFileSync('src/mcp/codecgcmcp/runtime/gemini-http-service.cjs','dist/mcp/codecgcmcp/runtime/gemini-http-service.cjs')\"",
     "dev": "tsx watch src/mcp/codexmcp/server.ts",
+    "lint": "biome check src/",
+    "format": "biome format src/",
     "test": "vitest",
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/postinstall.cjs"
@@ -37,6 +39,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.2",
     "@types/which": "^3.0.4",

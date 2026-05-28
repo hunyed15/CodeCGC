@@ -1,13 +1,16 @@
 import { spawn } from "child_process";
-import { Worker } from "worker_threads";
-import { resolve, join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { existsSync, readFileSync, unlinkSync } from "fs";
 import { randomBytes } from "crypto";
+import { existsSync, readFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
-import type { StepExecutor, WorkflowStep } from "../../../shared/types.js";
-import { resolveCliCommand, tryParseJson } from "../../../shared/process.js";
+import { dirname, join, resolve } from "path";
+import { fileURLToPath } from "url";
+import { Worker } from "worker_threads";
+import { createDebugLogger } from "../../../shared/debug.js";
 import { loadExecutorConfig } from "../../../shared/executor-config.js";
+import { resolveCliCommand, tryParseJson } from "../../../shared/process.js";
+import type { StepExecutor, WorkflowStep } from "../../../shared/types.js";
+
+const debug = createDebugLogger("executor");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -43,18 +46,26 @@ async function runViaWorker(opts: {
   const resultFile = join(tmpdir(), `cgc-worker-${randomBytes(6).toString("hex")}.json`);
 
   return new Promise((res) => {
-    const child = spawn("node", [workerPath, JSON.stringify({
-      cli: opts.cli || "codex",
-      cmd: opts.cmd[0],
-      args: [...opts.cmd.slice(1), ...opts.args],
-      cd: opts.cd,
-      env: opts.env,
-      sessionId: opts.sessionId,
-      timeoutMs: opts.timeoutMs,
-    }), resultFile], {
-      stdio: "ignore",
-      windowsHide: true,
-    });
+    const child = spawn(
+      "node",
+      [
+        workerPath,
+        JSON.stringify({
+          cli: opts.cli || "codex",
+          cmd: opts.cmd[0],
+          args: [...opts.cmd.slice(1), ...opts.args],
+          cd: opts.cd,
+          env: opts.env,
+          sessionId: opts.sessionId,
+          timeoutMs: opts.timeoutMs,
+        }),
+        resultFile,
+      ],
+      {
+        stdio: "ignore",
+        windowsHide: true,
+      },
+    );
 
     let resolved = false;
     let lastProgressWarn = 0;
@@ -62,12 +73,17 @@ async function runViaWorker(opts: {
     const fallbackTimeout = setTimeout(() => {
       if (resolved) return;
       resolved = true;
-      try { child.kill(); } catch {}
+      try {
+        child.kill();
+      } catch {}
       res({ success: false, sessionId: "", agentMessages: "", error: "Worker 超时" });
     }, opts.timeoutMs + 15000);
 
     const pollInterval = setInterval(() => {
-      if (resolved) { clearInterval(pollInterval); return; }
+      if (resolved) {
+        clearInterval(pollInterval);
+        return;
+      }
       if (existsSync(resultFile)) {
         clearInterval(pollInterval);
         clearTimeout(fallbackTimeout);
@@ -80,8 +96,12 @@ async function runViaWorker(opts: {
         } catch (e) {
           res({ success: false, sessionId: "", agentMessages: "", error: `结果解析失败: ${e}` });
         } finally {
-          try { unlinkSync(resultFile); } catch {}
-          try { unlinkSync(resultFile + ".progress"); } catch {}
+          try {
+            unlinkSync(resultFile);
+          } catch {}
+          try {
+            unlinkSync(resultFile + ".progress");
+          } catch {}
         }
       } else {
         // 读取进度文件检测卡死（节流 60 秒）
@@ -94,7 +114,7 @@ async function runViaWorker(opts: {
             const elapsed = now - progress.lastEventTime;
             if (elapsed > 120_000) {
               lastProgressWarn = now;
-              console.error(`[runViaWorker] ⚠️ CLI 可能卡死: phase=${progress.phase}, ${Math.floor(elapsed / 1000)}s 无事件`);
+              debug.log(`CLI 可能卡死: phase=${progress.phase}, ${Math.floor(elapsed / 1000)}s 无事件`);
             }
           } catch {}
         }
@@ -115,7 +135,9 @@ async function runViaWorker(opts: {
           } catch (e) {
             res({ success: false, sessionId: "", agentMessages: "", error: `结果解析失败: ${e}` });
           } finally {
-            try { unlinkSync(resultFile); } catch {}
+            try {
+              unlinkSync(resultFile);
+            } catch {}
           }
         } else {
           res({ success: false, sessionId: "", agentMessages: "", error: "Worker 退出但无结果文件" });
@@ -178,7 +200,7 @@ async function runCliViaHttp(opts: {
   }
 
   try {
-    console.error(`[runCliViaHttp:${opts.cli}] Calling ${HTTP_SERVICE_URL}/execute`);
+    debug.log(`Calling ${HTTP_SERVICE_URL}/execute`);
     const executeRes = await fetch(`${HTTP_SERVICE_URL}/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -193,24 +215,29 @@ async function runCliViaHttp(opts: {
     });
 
     if (!executeRes.ok) {
-      const error = await executeRes.json() as { error?: string };
+      const error = (await executeRes.json()) as { error?: string };
       return { success: false, sessionId: "", agentMessages: "", error: error.error || "HTTP service error" };
     }
 
-    const { requestId } = await executeRes.json() as { requestId: string };
-    console.error(`[runCliViaHttp:${opts.cli}] Got requestId: ${requestId}`);
+    const { requestId } = (await executeRes.json()) as { requestId: string };
+    debug.log(`Got requestId: ${requestId}`);
 
     const startTime = Date.now();
     let lastProgressCheck = startTime;
     const PROGRESS_CHECK_INTERVAL = 60_000;
 
     while (Date.now() - startTime < opts.timeoutMs + 10000) {
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 2000));
 
       const resultRes = await fetch(`${HTTP_SERVICE_URL}/result/${requestId}`);
       if (resultRes.ok) {
-        console.error(`[runCliViaHttp:${opts.cli}] Got result after ${Date.now() - startTime}ms`);
-        return await resultRes.json() as { success: boolean; sessionId: string; agentMessages: string; error?: string };
+        debug.log(`Got result after ${Date.now() - startTime}ms`);
+        return (await resultRes.json()) as {
+          success: boolean;
+          sessionId: string;
+          agentMessages: string;
+          error?: string;
+        };
       }
 
       const now = Date.now();
@@ -219,28 +246,30 @@ async function runCliViaHttp(opts: {
         try {
           const progressRes = await fetch(`${HTTP_SERVICE_URL}/progress/${requestId}`);
           if (progressRes.ok) {
-            const progress = await progressRes.json() as {
+            const progress = (await progressRes.json()) as {
               phase: string;
               lastEventTime: number;
               isAlive: boolean;
               isStuck: boolean;
               elapsedSinceLastEvent: number;
             };
-            console.error(`[runCliViaHttp:${opts.cli}] Progress: phase=${progress.phase}, isStuck=${progress.isStuck}, elapsed=${Math.floor(progress.elapsedSinceLastEvent / 1000)}s`);
+            debug.log(
+              `Progress: phase=${progress.phase}, isStuck=${progress.isStuck}, elapsed=${Math.floor(progress.elapsedSinceLastEvent / 1000)}s`,
+            );
             if (progress.isStuck) {
-              console.error(`[runCliViaHttp:${opts.cli}] ⚠️ CLI appears stuck (no events for ${Math.floor(progress.elapsedSinceLastEvent / 1000)}s)`);
+              debug.warn(`CLI appears stuck (no events for ${Math.floor(progress.elapsedSinceLastEvent / 1000)}s)`);
             }
           }
         } catch (e) {
-          console.error(`[runCliViaHttp:${opts.cli}] Progress check failed:`, e);
+          debug.warn(`Progress check failed:`, e);
         }
       }
     }
 
-    console.error(`[runCliViaHttp:${opts.cli}] Polling timeout`);
+    debug.log(`Polling timeout`);
     return { success: false, sessionId: "", agentMessages: "", error: "HTTP 轮询超时" };
   } catch (e: any) {
-    console.error(`[runCliViaHttp:${opts.cli}] Exception:`, e.message);
+    debug.warn(`Exception:`, e.message);
     return { success: false, sessionId: "", agentMessages: "", error: `HTTP 服务不可用: ${e.message}` };
   }
 }
@@ -382,7 +411,11 @@ async function runGeminiDirectly(opts: {
           errorMessage = JSON.stringify(event);
         }
         if (event.type === "turn.completed" || event.type === "result") {
-          setTimeout(() => { try { proc.kill(); } catch {} }, 300);
+          setTimeout(() => {
+            try {
+              proc.kill();
+            } catch {}
+          }, 300);
         }
       }
     });
@@ -392,10 +425,10 @@ async function runGeminiDirectly(opts: {
       clearTimeout(timeout);
       resolved = true;
       res({
-        success: timedOut ? false : (!!sessionId && !errorMessage),
+        success: timedOut ? false : !!sessionId && !errorMessage,
         sessionId,
         agentMessages,
-        error: timedOut ? `执行超时（${opts.timeoutMs}ms）` : (errorMessage || undefined),
+        error: timedOut ? `执行超时（${opts.timeoutMs}ms）` : errorMessage || undefined,
       });
     });
 
@@ -414,19 +447,13 @@ async function runGeminiDirectly(opts: {
 export async function callBackendExecutor(
   step: WorkflowStep,
   projectRoot: string,
-  timeoutMs = 900_000
+  timeoutMs = 900_000,
 ): Promise<ExecutorCallResult> {
   const cmd = await resolveCliCommand("codex");
   const cd = resolve(step.cd ?? projectRoot);
   const prompt = buildBackendPrompt(step);
 
-  const args = [
-    "exec",
-    "--sandbox", "workspace-write",
-    "--cd", cd,
-    "--json",
-    "--skip-git-repo-check",
-  ];
+  const args = ["exec", "--sandbox", "workspace-write", "--cd", cd, "--json", "--skip-git-repo-check"];
   if (step.session_id) args.push("resume", step.session_id);
   args.push("--", prompt);
 
@@ -435,10 +462,10 @@ export async function callBackendExecutor(
 
   let result: { success: boolean; sessionId: string; agentMessages: string; error?: string };
   if (await isHttpServiceAvailable()) {
-    console.error(`[callBackendExecutor] HTTP service available, using HTTP path`);
+    debug.log(`HTTP service available, using HTTP path`);
     result = await runCliViaHttp({ cli: "codex", cmd, args, cd, env, sessionId, timeoutMs });
   } else {
-    console.error(`[callBackendExecutor] HTTP service unavailable, falling back to worker`);
+    debug.log(`HTTP service unavailable, falling back to worker`);
     result = await runViaWorker({ cmd, args, cd, env, sessionId, timeoutMs });
   }
 
@@ -460,7 +487,7 @@ export async function callBackendExecutor(
 export async function callFrontendExecutor(
   step: WorkflowStep,
   projectRoot: string,
-  timeoutMs = 900_000
+  timeoutMs = 900_000,
 ): Promise<ExecutorCallResult> {
   const cmd = await resolveCliCommand("gemini");
   const cd = resolve(step.cd ?? projectRoot);
@@ -468,10 +495,14 @@ export async function callFrontendExecutor(
 
   const args = [
     "--skip-trust",
-    "--approval-mode", "yolo",
-    "--prompt", prompt,
-    "-o", "stream-json",
-    "--allowed-mcp-server-names", "__codecgc_none__",
+    "--approval-mode",
+    "yolo",
+    "--prompt",
+    prompt,
+    "-o",
+    "stream-json",
+    "--allowed-mcp-server-names",
+    "__codecgc_none__",
   ];
   if (step.session_id) args.push("--resume", step.session_id);
 
@@ -480,10 +511,10 @@ export async function callFrontendExecutor(
 
   let result: { success: boolean; sessionId: string; agentMessages: string; error?: string };
   if (await isHttpServiceAvailable()) {
-    console.error(`[callFrontendExecutor] HTTP service available, using HTTP path`);
+    debug.log(`HTTP service available, using HTTP path`);
     result = await runCliViaHttp({ cli: "gemini", cmd, args, cd, env, sessionId, timeoutMs });
   } else {
-    console.error(`[callFrontendExecutor] HTTP service unavailable, falling back to worker`);
+    debug.log(`HTTP service unavailable, falling back to worker`);
     result = await runViaWorker({ cli: "gemini", cmd, args, cd, env, sessionId, timeoutMs });
   }
 
@@ -505,16 +536,13 @@ export async function callFrontendExecutor(
 export async function callOpenCodeExecutor(
   step: WorkflowStep,
   projectRoot: string,
-  timeoutMs = 900_000
+  timeoutMs = 900_000,
 ): Promise<ExecutorCallResult> {
   const cmd = await resolveCliCommand("opencode");
   const cd = resolve(step.cd ?? projectRoot);
   const prompt = buildFrontendPrompt(step);
 
-  const args = [
-    "--json",
-    "--prompt", prompt,
-  ];
+  const args = ["--json", "--prompt", prompt];
   if (step.session_id) args.push("--resume", step.session_id);
 
   const env = { NODE_OPTIONS: "" };
@@ -522,10 +550,10 @@ export async function callOpenCodeExecutor(
 
   let result: { success: boolean; sessionId: string; agentMessages: string; error?: string };
   if (await isHttpServiceAvailable()) {
-    console.error(`[callOpenCodeExecutor] HTTP service available, using HTTP path`);
+    debug.log(`HTTP service available, using HTTP path`);
     result = await runCliViaHttp({ cli: "opencode", cmd, args, cd, env, sessionId, timeoutMs });
   } else {
-    console.error(`[callOpenCodeExecutor] HTTP service unavailable, falling back to worker`);
+    debug.log(`HTTP service unavailable, falling back to worker`);
     result = await runViaWorker({ cli: "opencode", cmd, args, cd, env, sessionId, timeoutMs });
   }
 
@@ -545,9 +573,7 @@ export async function callOpenCodeExecutor(
  * 轻量模式执行器 — Claude 直接处理，不调用外部 CLI
  * 返回结果指示 Claude 应自行执行此步骤
  */
-export function callClaudeExecutor(
-  step: WorkflowStep,
-): ExecutorCallResult {
+export function callClaudeExecutor(step: WorkflowStep): ExecutorCallResult {
   const prompt = step.executor === "backend" ? buildBackendPrompt(step) : buildFrontendPrompt(step);
 
   return {
@@ -643,7 +669,7 @@ function buildFrontendPrompt(step: WorkflowStep): string {
 export async function callExecutor(
   step: WorkflowStep,
   projectRoot: string,
-  timeoutMs = 900_000
+  timeoutMs = 900_000,
 ): Promise<ExecutorCallResult> {
   // Input validation
   if (!step || typeof step !== "object") {
@@ -662,7 +688,7 @@ export async function callExecutor(
   if (step.executor === "backend") {
     const provider = config.executors.backend.provider;
     if (provider === "claude" || config.mode === "lightweight") {
-      console.error(`[callExecutor] 轻量模式/backend provider=claude, Claude 直接处理`);
+      debug.log(`轻量模式/backend provider=claude, Claude 直接处理`);
       return callClaudeExecutor(step);
     }
     // provider === "codex"
@@ -672,7 +698,7 @@ export async function callExecutor(
   if (step.executor === "frontend") {
     const provider = config.executors.frontend.provider;
     if (provider === "claude" || config.mode === "lightweight") {
-      console.error(`[callExecutor] 轻量模式/frontend provider=claude, Claude 直接处理`);
+      debug.log(`轻量模式/frontend provider=claude, Claude 直接处理`);
       return callClaudeExecutor(step);
     }
     if (provider === "opencode") {

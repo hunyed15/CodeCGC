@@ -1,13 +1,9 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { BackendTaskOptions, CodexOptions } from "../../shared/types.js";
 import { runCodexSession } from "./executor.js";
 import { executeBackendTask } from "./tools.js";
-import type { CodexOptions, BackendTaskOptions } from "../../shared/types.js";
 
 const TOOLS: Tool[] = [
   {
@@ -59,10 +55,7 @@ const TOOLS: Tool[] = [
   },
 ];
 
-const server = new Server(
-  { name: "codexmcp", version: "0.1.0" },
-  { capabilities: { tools: {} } }
-);
+const server = new Server({ name: "codexmcp", version: "0.1.0" }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
@@ -75,7 +68,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const opts: CodexOptions = {
         prompt: args.PROMPT as string,
         cd: args.cd as string,
-        sandbox: args.sandbox as any,
+        sandbox: (args.sandbox as CodexOptions["sandbox"]) || "workspace-write",
         sessionId: args.SESSION_ID as string | undefined,
         skipGitRepoCheck: args.skip_git_repo_check as boolean,
         returnAllMessages: args.return_all_messages as boolean,
@@ -108,7 +101,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         acceptanceCriteria: args.acceptance_criteria as string[] | undefined,
         cd: args.cd as string | undefined,
         sessionId: args.SESSION_ID as string | undefined,
-        sandbox: args.sandbox as any,
+        sandbox: (args.sandbox as BackendTaskOptions["sandbox"]) || "workspace-write",
         returnAllMessages: args.return_all_messages as boolean,
         model: args.model as string | undefined,
         profile: args.profile as string | undefined,

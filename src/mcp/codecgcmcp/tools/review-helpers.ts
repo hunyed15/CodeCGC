@@ -1,7 +1,7 @@
-import { readFile, stat } from "fs/promises";
 import { existsSync } from "fs";
+import { readFile, stat } from "fs/promises";
 import { isAbsolute, join } from "path";
-import type { ReviewRequest, ReviewIssue, ReviewDecision } from "./review.js";
+import type { ReviewDecision, ReviewIssue, ReviewRequest } from "./review.js";
 
 /**
  * 找到最新的执行类 audit（非 review）
@@ -27,7 +27,7 @@ export async function findLatestExecAudit(auditFiles: string[]): Promise<string 
 export async function readFilesForReview(
   projectRoot: string,
   paths: string[],
-  maxSizeKb: number
+  maxSizeKb: number,
 ): Promise<ReviewRequest["file_contents"]> {
   const results: ReviewRequest["file_contents"] = [];
   const maxBytes = maxSizeKb * 1024;
@@ -51,7 +51,7 @@ export async function readFilesForReview(
       // 如果文件超过限制，只读取前 maxBytes
       if (sizeBytes > maxBytes) {
         const buffer = Buffer.alloc(maxBytes);
-        const fd = await import("fs/promises").then(m => m.open(absPath, "r"));
+        const fd = await import("fs/promises").then((m) => m.open(absPath, "r"));
         try {
           await fd.read(buffer, 0, maxBytes, 0);
           const content = buffer.toString("utf-8");
@@ -120,7 +120,7 @@ export async function collectPreviousReviews(auditFiles: string[]): Promise<Revi
 export function generateRecommendation(
   step: any,
   execution: ReviewRequest["execution"],
-  previousReviews: ReviewRequest["previous_reviews"]
+  previousReviews: ReviewRequest["previous_reviews"],
 ): string {
   const parts: string[] = [];
 
@@ -135,7 +135,7 @@ export function generateRecommendation(
   if (previousReviews.length > 0) {
     const lastReview = previousReviews[previousReviews.length - 1];
     parts.push(
-      `历史已有 ${previousReviews.length} 次审核，最近一次 decision=${lastReview.decision}（${lastReview.issues_count} 个问题）`
+      `历史已有 ${previousReviews.length} 次审核，最近一次 decision=${lastReview.decision}（${lastReview.issues_count} 个问题）`,
     );
     if (lastReview.decision === "changes-requested") {
       parts.push("请重点检查上次提出的问题是否已修复");
@@ -143,7 +143,7 @@ export function generateRecommendation(
   }
 
   parts.push(
-    `请逐条核对 ${step.acceptance?.length ?? 0} 个验收标准，分析 ${execution.changed_files.length} 个变更文件，给出 decision（approved/changes-requested/rejected）和详细 issues 列表`
+    `请逐条核对 ${step.acceptance?.length ?? 0} 个验收标准，分析 ${execution.changed_files.length} 个变更文件，给出 decision（approved/changes-requested/rejected）和详细 issues 列表`,
   );
 
   return parts.join("\n");

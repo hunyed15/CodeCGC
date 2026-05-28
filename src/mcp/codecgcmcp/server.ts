@@ -1,28 +1,24 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "child_process";
-import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { entry, type EntryArgs } from "./tools/entry.js";
-import { plan, type PlanArgs } from "./tools/plan.js";
-import { build, type BuildArgs } from "./tools/build.js";
-import { fix, type FixArgs } from "./tools/fix.js";
-import { test, type TestArgs } from "./tools/test.js";
-import { review, type ReviewArgs } from "./tools/review.js";
-import { explain, type ExplainArgs } from "./tools/explain.js";
-import { route, type RouteArgs } from "./tools/route.js";
-import { history, type HistoryArgs } from "./tools/history.js";
-import { init, type InitArgs } from "./tools/init.js";
-import { status, type StatusArgs } from "./tools/status.js";
-import { doctor, type DoctorArgs } from "./tools/doctor.js";
-import { continueExecution, type ContinueArgs } from "./tools/continue.js";
-import { audit, type AuditArgs } from "./tools/audit.js";
-import { manual, type ManualArgs } from "./tools/manual.js";
+import { fileURLToPath } from "url";
+import { type AuditArgs, audit } from "./tools/audit.js";
+import { type BuildArgs, build } from "./tools/build.js";
+import { type ContinueArgs, continueExecution } from "./tools/continue.js";
+import { type DoctorArgs, doctor } from "./tools/doctor.js";
+import { type EntryArgs, entry } from "./tools/entry.js";
+import { type ExplainArgs, explain } from "./tools/explain.js";
+import { type FixArgs, fix } from "./tools/fix.js";
+import { type HistoryArgs, history } from "./tools/history.js";
+import { type InitArgs, init } from "./tools/init.js";
+import { type ManualArgs, manual } from "./tools/manual.js";
+import { type PlanArgs, plan } from "./tools/plan.js";
+import { type ReviewArgs, review } from "./tools/review.js";
+import { type RouteArgs, route } from "./tools/route.js";
+import { type StatusArgs, status } from "./tools/status.js";
+import { type TestArgs, test } from "./tools/test.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -61,7 +57,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: "codecgc.route",
-    description: "根据路径判断归属（backend/frontend/docs/orchestration），推荐 executor。支持混合路由策略：1) executor_hint 显式声明（优先级最高）；2) 目录约定；3) routing.yaml 规则",
+    description:
+      "根据路径判断归属（backend/frontend/docs/orchestration），推荐 executor。支持混合路由策略：1) executor_hint 显式声明（优先级最高）；2) 目录约定；3) routing.yaml 规则",
     inputSchema: {
       type: "object",
       properties: {
@@ -70,7 +67,8 @@ const TOOLS: Tool[] = [
         executor_hint: {
           type: "string",
           enum: ["frontend", "backend", "docs", "both"],
-          description: "可选。显式声明 executor（优先级最高）。frontend=前端任务，backend=后端任务，docs=文档任务，both=前后端都要改（自动拆分）",
+          description:
+            "可选。显式声明 executor（优先级最高）。frontend=前端任务，backend=后端任务，docs=文档任务，both=前后端都要改（自动拆分）",
         },
       },
       required: ["paths"],
@@ -92,7 +90,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: "codecgc.init",
-    description: "初始化项目（创建 .codecgc/ 目录、.codecgc/config/routing.yaml、executors.yaml、.mcp.json、.claude/CLAUDE.md）",
+    description:
+      "初始化项目（创建 .codecgc/ 目录、.codecgc/config/routing.yaml、executors.yaml、.mcp.json、.claude/CLAUDE.md）",
     inputSchema: {
       type: "object",
       properties: {
@@ -267,7 +266,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: "codecgc.review",
-    description: "审核步骤执行结果。两种模式：(1) 不传 decision = prepare 模式，返回审核请求包（代码、验收、历史）供 Claude 分析；(2) 传 decision = 写入审核决定（approved/changes-requested/rejected/reopen），可附带 issues 和 suggestions",
+    description:
+      "审核步骤执行结果。两种模式：(1) 不传 decision = prepare 模式，返回审核请求包（代码、验收、历史）供 Claude 分析；(2) 传 decision = 写入审核决定（approved/changes-requested/rejected/reopen），可附带 issues 和 suggestions",
     inputSchema: {
       type: "object",
       properties: {
@@ -277,7 +277,7 @@ const TOOLS: Tool[] = [
         decision: {
           type: "string",
           enum: ["approved", "changes-requested", "rejected", "reopen"],
-          description: "可选。不传则进入 prepare 模式（返回审核请求包）；传则写入审核决定"
+          description: "可选。不传则进入 prepare 模式（返回审核请求包）；传则写入审核决定",
         },
         notes: { type: "string", description: "审核备注（总体说明）" },
         issues: {
@@ -287,19 +287,22 @@ const TOOLS: Tool[] = [
             type: "object",
             properties: {
               severity: { type: "string", enum: ["critical", "major", "minor", "info"] },
-              category: { type: "string", enum: ["correctness", "security", "performance", "style", "completeness", "other"] },
+              category: {
+                type: "string",
+                enum: ["correctness", "security", "performance", "style", "completeness", "other"],
+              },
               file: { type: "string" },
               line: { type: "number" },
               description: { type: "string" },
-              suggestion: { type: "string" }
+              suggestion: { type: "string" },
             },
-            required: ["severity", "category", "description"]
-          }
+            required: ["severity", "category", "description"],
+          },
         },
         suggestions: {
           type: "array",
           items: { type: "string" },
-          description: "改进建议清单（decision 模式）"
+          description: "改进建议清单（decision 模式）",
         },
         acceptance_check: {
           type: "array",
@@ -309,10 +312,10 @@ const TOOLS: Tool[] = [
             properties: {
               criterion: { type: "string" },
               passed: { type: "boolean" },
-              note: { type: "string" }
+              note: { type: "string" },
             },
-            required: ["criterion", "passed"]
-          }
+            required: ["criterion", "passed"],
+          },
         },
         max_file_size_kb: { type: "number", description: "prepare 模式下单文件最大读取（KB），默认 200" },
         cd: { type: "string" },
@@ -322,10 +325,7 @@ const TOOLS: Tool[] = [
   },
 ];
 
-const server = new Server(
-  { name: "codecgcmcp", version: "1.0.0" },
-  { capabilities: { tools: {} } }
-);
+const server = new Server({ name: "codecgcmcp", version: "1.0.0" }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
@@ -484,7 +484,7 @@ async function startCliHttpService(): Promise<void> {
     console.error(`[codecgcmcp] CLI HTTP service started (PID: ${proc.pid})`);
 
     // Wait a bit and verify service is actually running
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     try {
       const verifyResponse = await fetch(`http://127.0.0.1:${HTTP_PORT}/health`, {

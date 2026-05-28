@@ -33,32 +33,37 @@ const MAX_MESSAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Cleanup expired sessions every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  let cleaned = 0;
-  for (const [requestId, session] of sessions.entries()) {
-    if (now - session.timestamp > SESSION_TTL_MS) {
-      sessions.delete(requestId);
-      cleaned++;
+setInterval(
+  () => {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [requestId, session] of sessions.entries()) {
+      if (now - session.timestamp > SESSION_TTL_MS) {
+        sessions.delete(requestId);
+        cleaned++;
+      }
     }
-  }
-  for (const [requestId, progress] of progressMap.entries()) {
-    if (now - progress.lastEventTime > SESSION_TTL_MS) {
-      progressMap.delete(requestId);
-      cleaned++;
+    for (const [requestId, progress] of progressMap.entries()) {
+      if (now - progress.lastEventTime > SESSION_TTL_MS) {
+        progressMap.delete(requestId);
+        cleaned++;
+      }
     }
-  }
-  if (cleaned > 0) {
-    console.error(`[cleanup] Removed ${cleaned} expired sessions/progress`);
-  }
-}, 5 * 60 * 1000);
+    if (cleaned > 0) {
+      console.error(`[cleanup] Removed ${cleaned} expired sessions/progress`);
+    }
+  },
+  5 * 60 * 1000,
+);
 
 function tryParseJson(line) {
   try {
     const parsed = JSON.parse(line.trim());
     if (typeof parsed === "object" && parsed !== null) return parsed;
     return null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -111,7 +116,9 @@ function detectPhase(event) {
 function spawnCLI(opts) {
   const requestId = randomBytes(8).toString("hex");
   const cliType = opts.cli || "gemini";
-  console.error(`[spawnCLI] Starting requestId=${requestId}, cli=${cliType}, cmd=${opts.cmd}, args=${JSON.stringify(opts.args).slice(0, 100)}`);
+  console.error(
+    `[spawnCLI] Starting requestId=${requestId}, cli=${cliType}, cmd=${opts.cmd}, args=${JSON.stringify(opts.args).slice(0, 100)}`,
+  );
 
   const proc = spawn(opts.cmd, opts.args, {
     cwd: opts.cd,
@@ -142,7 +149,9 @@ function spawnCLI(opts) {
     try {
       if (proc.pid) {
         if (process.platform === "win32") {
-          require("child_process").execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+          require("child_process").execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+            stdio: "ignore",
+          });
         } else {
           process.kill(-proc.pid, "SIGTERM");
         }
@@ -229,7 +238,11 @@ function spawnCLI(opts) {
             timestamp: Date.now(),
           });
         }
-        setTimeout(() => { try { proc.kill(); } catch {} }, 300);
+        setTimeout(() => {
+          try {
+            proc.kill();
+          } catch {}
+        }, 300);
       }
     }
   });
@@ -247,7 +260,9 @@ function spawnCLI(opts) {
   });
 
   proc.on("exit", () => {
-    console.error(`[spawnCLI] Process exited, requestId=${requestId}, cli=${cliType}, resolved=${resolved}, sessionId=${sessionId}, stderr=${stderrOutput.slice(0, 100)}`);
+    console.error(
+      `[spawnCLI] Process exited, requestId=${requestId}, cli=${cliType}, resolved=${resolved}, sessionId=${sessionId}, stderr=${stderrOutput.slice(0, 100)}`,
+    );
 
     // Mark progress as dead
     const progress = progressMap.get(requestId);
@@ -289,7 +304,7 @@ const server = http.createServer((req, res) => {
     let body = "";
     let bodySize = 0;
 
-    req.on("data", chunk => {
+    req.on("data", (chunk) => {
       bodySize += chunk.length;
       if (bodySize > MAX_BODY_SIZE) {
         req.destroy();
@@ -352,15 +367,17 @@ const server = http.createServer((req, res) => {
       const isStuck = elapsed > 120_000 && progress.isAlive;
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        requestId,
-        phase: isStuck ? "stuck" : progress.phase,
-        lastEventTime: progress.lastEventTime,
-        lastEventType: progress.lastEventType,
-        isAlive: progress.isAlive,
-        elapsedSinceLastEvent: elapsed,
-        isStuck,
-      }));
+      res.end(
+        JSON.stringify({
+          requestId,
+          phase: isStuck ? "stuck" : progress.phase,
+          lastEventTime: progress.lastEventTime,
+          lastEventType: progress.lastEventType,
+          isAlive: progress.isAlive,
+          elapsedSinceLastEvent: elapsed,
+          isStuck,
+        }),
+      );
     } else {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Progress not found" }));
@@ -372,7 +389,9 @@ const server = http.createServer((req, res) => {
       if (progress.proc && progress.isAlive) {
         try {
           if (process.platform === "win32") {
-            require("child_process").execFileSync("taskkill", ["/PID", String(progress.proc.pid), "/T", "/F"], { stdio: "ignore" });
+            require("child_process").execFileSync("taskkill", ["/PID", String(progress.proc.pid), "/T", "/F"], {
+              stdio: "ignore",
+            });
           } else {
             process.kill(-progress.proc.pid, "SIGTERM");
           }

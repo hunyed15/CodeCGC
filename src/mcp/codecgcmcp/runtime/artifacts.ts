@@ -1,32 +1,15 @@
-import { existsSync } from "fs";
-import { readdir, readFile, writeFile, unlink } from "fs/promises";
-import { join } from "path";
 import { randomBytes } from "crypto";
+import { existsSync } from "fs";
+import { readdir, readFile, unlink, writeFile } from "fs/promises";
+import { join } from "path";
+import type { ArtifactClass, Workflow, WorkflowKind, WorkflowStep } from "../../../shared/types.js";
 import { readYaml, writeYaml } from "../../../shared/yaml.js";
-import type {
-  Workflow,
-  WorkflowStep,
-  WorkflowKind,
-  ArtifactClass,
-} from "../../../shared/types.js";
-import {
-  codecgcRoot,
-  featureDir,
-  issueDir,
-  workflowFile,
-  auditDir,
-  ensureDir,
-  today,
-} from "./paths.js";
+import { auditDir, codecgcRoot, ensureDir, featureDir, issueDir, today, workflowFile } from "./paths.js";
 
 /**
  * 创建一个新的空 workflow
  */
-export function createWorkflow(opts: {
-  kind: WorkflowKind;
-  slug: string;
-  artifactClass?: ArtifactClass;
-}): Workflow {
+export function createWorkflow(opts: { kind: WorkflowKind; slug: string; artifactClass?: ArtifactClass }): Workflow {
   return {
     version: 1,
     kind: opts.kind,
@@ -40,22 +23,14 @@ export function createWorkflow(opts: {
 /**
  * 根据 kind+slug 解析 workflow 目录
  */
-export function resolveWorkflowDir(
-  projectRoot: string,
-  kind: WorkflowKind,
-  slug: string
-): string {
+export function resolveWorkflowDir(projectRoot: string, kind: WorkflowKind, slug: string): string {
   return kind === "feature" ? featureDir(projectRoot, slug) : issueDir(projectRoot, slug);
 }
 
 /**
  * 读取 workflow.yaml
  */
-export async function readWorkflow(
-  projectRoot: string,
-  kind: WorkflowKind,
-  slug: string
-): Promise<Workflow> {
+export async function readWorkflow(projectRoot: string, kind: WorkflowKind, slug: string): Promise<Workflow> {
   try {
     const dir = resolveWorkflowDir(projectRoot, kind, slug);
     const file = workflowFile(dir);
@@ -76,10 +51,7 @@ export async function readWorkflow(
 /**
  * 写入 workflow.yaml（自动创建目录）
  */
-export async function writeWorkflow(
-  projectRoot: string,
-  workflow: Workflow
-): Promise<string> {
+export async function writeWorkflow(projectRoot: string, workflow: Workflow): Promise<string> {
   try {
     if (!workflow || typeof workflow !== "object") {
       throw new Error("workflow must be a valid object");
@@ -130,7 +102,11 @@ async function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<
   try {
     return await fn();
   } finally {
-    try { await unlink(lockFile); } catch { /* ignore */ }
+    try {
+      await unlink(lockFile);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -177,14 +153,13 @@ export function nextPendingStep(workflow: Workflow, skipManual = false): Workflo
  * 列出所有 workflow（feature 和 issue）
  */
 export async function listWorkflows(
-  projectRoot: string
+  projectRoot: string,
 ): Promise<Array<{ kind: WorkflowKind; slug: string; dir: string }>> {
   const result: Array<{ kind: WorkflowKind; slug: string; dir: string }> = [];
 
   for (const kind of ["feature", "issue"] as WorkflowKind[]) {
-    const baseDir = kind === "feature"
-      ? join(codecgcRoot(projectRoot), "features")
-      : join(codecgcRoot(projectRoot), "issues");
+    const baseDir =
+      kind === "feature" ? join(codecgcRoot(projectRoot), "features") : join(codecgcRoot(projectRoot), "issues");
     if (!existsSync(baseDir)) continue;
 
     const entries = await readdir(baseDir, { withFileTypes: true });
@@ -202,11 +177,7 @@ export async function listWorkflows(
 /**
  * 写入审计日志（每次执行器调用一份）
  */
-export async function writeAudit(
-  workflowDir: string,
-  stepId: string,
-  data: Record<string, unknown>
-): Promise<string> {
+export async function writeAudit(workflowDir: string, stepId: string, data: Record<string, unknown>): Promise<string> {
   try {
     if (!stepId || typeof stepId !== "string") {
       throw new Error("stepId is required and must be a string");
@@ -271,17 +242,9 @@ export async function listAudits(workflowDir: string, stepId?: string): Promise<
  * 2. 再检查是否有 pending 步骤但无执行类 audit（awaiting-build/fix）
  * 3. 最后检查是否全部完成（closed）
  */
-export type WorkflowState =
-  | "needs-planning"
-  | "awaiting-build"
-  | "awaiting-fix"
-  | "awaiting-review"
-  | "closed";
+export type WorkflowState = "needs-planning" | "awaiting-build" | "awaiting-fix" | "awaiting-review" | "closed";
 
-export async function inferWorkflowState(
-  projectRoot: string,
-  workflow: Workflow
-): Promise<WorkflowState> {
+export async function inferWorkflowState(projectRoot: string, workflow: Workflow): Promise<WorkflowState> {
   if (workflow.steps.length === 0) return "needs-planning";
 
   const pending = nextPendingStep(workflow);

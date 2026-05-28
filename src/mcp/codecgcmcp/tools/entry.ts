@@ -1,13 +1,13 @@
 import { existsSync } from "fs";
+import type { ArtifactClass, WorkflowKind } from "../../../shared/types.js";
 import {
   createWorkflow,
+  inferWorkflowState,
+  readWorkflow,
   resolveWorkflowDir,
   writeWorkflow,
-  readWorkflow,
-  inferWorkflowState,
 } from "../runtime/artifacts.js";
 import { resolveProjectRoot, slugify, today, workflowFile } from "../runtime/paths.js";
-import type { WorkflowKind, ArtifactClass } from "../../../shared/types.js";
 
 export interface EntryArgs {
   description: string;
@@ -127,7 +127,7 @@ function inferKind(description: string): WorkflowKind {
  */
 function extractKeyword(description: string): string {
   const cleaned = description
-    .replace(/[，。！？、；：""''「」（）()【】\[\]]/g, " ")
+    .replace(/[，。！？、；：""''「」（）()【】[\]]/g, " ")
     .replace(/\s+/g, "-")
     .replace(/^-+|-+$/g, "");
 

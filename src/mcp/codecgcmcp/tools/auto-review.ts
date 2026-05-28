@@ -1,19 +1,15 @@
-import { readFile } from "fs/promises";
 import { existsSync } from "fs";
-import {
-  resolveWorkflowDir,
-  listAudits,
-  readWorkflow,
-} from "../runtime/artifacts.js";
-import { resolveProjectRoot } from "../runtime/paths.js";
-import { readRouting, classifyPaths, hasMixedOwnership } from "../runtime/routing.js";
+import { readFile } from "fs/promises";
 import type { WorkflowKind } from "../../../shared/types.js";
-import type { ReviewRequest, ReviewIssue } from "./review.js";
+import { listAudits, readWorkflow, resolveWorkflowDir } from "../runtime/artifacts.js";
+import { resolveProjectRoot } from "../runtime/paths.js";
+import { classifyPaths, hasMixedOwnership, readRouting } from "../runtime/routing.js";
+import type { ReviewIssue, ReviewRequest } from "./review.js";
 import {
-  readFilesForReview,
   collectPreviousReviews,
   findLatestExecAudit,
   generateRecommendation,
+  readFilesForReview,
 } from "./review-helpers.js";
 
 /**
@@ -80,9 +76,7 @@ export async function autoCollectReviewContext(opts: {
     };
 
     // 读取变更文件内容
-    const filesToRead = executionInfo.changed_files.length > 0
-      ? executionInfo.changed_files
-      : step.paths;
+    const filesToRead = executionInfo.changed_files.length > 0 ? executionInfo.changed_files : step.paths;
 
     const fileContents = await readFilesForReview(projectRoot, filesToRead, maxFileSizeKb);
 

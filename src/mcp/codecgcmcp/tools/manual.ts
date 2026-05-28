@@ -1,12 +1,6 @@
-import {
-  readWorkflow,
-  writeWorkflow,
-  resolveWorkflowDir,
-  findStep,
-  writeAudit,
-} from "../runtime/artifacts.js";
-import { resolveProjectRoot } from "../runtime/paths.js";
 import type { WorkflowKind } from "../../../shared/types.js";
+import { findStep, readWorkflow, resolveWorkflowDir, writeAudit, writeWorkflow } from "../runtime/artifacts.js";
+import { resolveProjectRoot } from "../runtime/paths.js";
 
 export interface ManualArgs {
   kind: WorkflowKind;

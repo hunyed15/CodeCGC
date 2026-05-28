@@ -1,13 +1,9 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { FrontendTaskOptions, GeminiOptions } from "../../shared/types.js";
 import { runGeminiSession } from "./executor.js";
 import { executeFrontendTask } from "./tools.js";
-import type { GeminiOptions, FrontendTaskOptions } from "../../shared/types.js";
 
 const TOOLS: Tool[] = [
   {
@@ -54,10 +50,7 @@ const TOOLS: Tool[] = [
   },
 ];
 
-const server = new Server(
-  { name: "geminimcp", version: "0.1.0" },
-  { capabilities: { tools: {} } }
-);
+const server = new Server({ name: "geminimcp", version: "0.1.0" }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 

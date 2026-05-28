@@ -12,7 +12,9 @@ function tryParseJson(line) {
     const parsed = JSON.parse(line.trim());
     if (typeof parsed === "object" && parsed !== null) return parsed;
     return null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 async function main() {
@@ -78,19 +80,29 @@ async function main() {
         errorMessage = JSON.stringify(event);
       }
       if (event.type === "turn.completed" || event.type === "result") {
-        setTimeout(() => { try { proc.kill(); } catch {} }, 300);
+        setTimeout(() => {
+          try {
+            proc.kill();
+          } catch {}
+        }, 300);
       }
     }
   });
 
   await new Promise((resolve) => {
     proc.once("exit", () => {
-      try { require("fs").closeSync(stdinFd); } catch {}
+      try {
+        require("fs").closeSync(stdinFd);
+      } catch {}
       resolve();
     });
     setTimeout(() => {
-      try { proc.kill(); } catch {}
-      try { require("fs").closeSync(stdinFd); } catch {}
+      try {
+        proc.kill();
+      } catch {}
+      try {
+        require("fs").closeSync(stdinFd);
+      } catch {}
       resolve();
     }, timeoutMs + 5000);
   });
@@ -98,15 +110,15 @@ async function main() {
   clearTimeout(timeout);
 
   const result = {
-    success: timedOut ? false : (!!sessionId && !errorMessage),
+    success: timedOut ? false : !!sessionId && !errorMessage,
     sessionId,
     agentMessages,
-    error: timedOut ? `执行超时（${timeoutMs}ms）` : (errorMessage || undefined),
+    error: timedOut ? `执行超时（${timeoutMs}ms）` : errorMessage || undefined,
   };
 
   parentPort.postMessage(result);
 }
 
-main().catch(e => {
+main().catch((e) => {
   parentPort.postMessage({ success: false, sessionId: "", agentMessages: "", error: e.message });
 });

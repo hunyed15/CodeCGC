@@ -1,6 +1,6 @@
 import * as path from "path";
-import { runGeminiSession } from "./executor.js";
 import type { FrontendTaskOptions, TaskResult } from "../../shared/types.js";
+import { runGeminiSession } from "./executor.js";
 
 // 后端路径模式（前端执行器拒绝这些路径）
 const BACKEND_PATTERNS = [
@@ -17,13 +17,9 @@ const BACKEND_PATTERNS = [
 ];
 
 function validateFrontendPaths(paths: string[]): void {
-  const violations = paths.filter((p) =>
-    BACKEND_PATTERNS.some((re) => re.test(p.replace(/\\/g, "/")))
-  );
+  const violations = paths.filter((p) => BACKEND_PATTERNS.some((re) => re.test(p.replace(/\\/g, "/"))));
   if (violations.length > 0) {
-    throw new Error(
-      `前端执行器拒绝以下疑似后端路径：${violations.join(", ")}`
-    );
+    throw new Error(`前端执行器拒绝以下疑似后端路径：${violations.join(", ")}`);
   }
 }
 

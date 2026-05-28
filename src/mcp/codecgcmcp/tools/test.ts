@@ -1,14 +1,8 @@
-import {
-  readWorkflow,
-  writeWorkflow,
-  markStepDone,
-  resolveWorkflowDir,
-  writeAudit,
-} from "../runtime/artifacts.js";
-import { resolveProjectRoot, validateStepPaths } from "../runtime/paths.js";
-import { callExecutor } from "../runtime/executor.js";
-import { readRouting, classifyPaths } from "../runtime/routing.js";
 import type { WorkflowKind } from "../../../shared/types.js";
+import { markStepDone, readWorkflow, resolveWorkflowDir, writeAudit, writeWorkflow } from "../runtime/artifacts.js";
+import { callExecutor } from "../runtime/executor.js";
+import { resolveProjectRoot, validateStepPaths } from "../runtime/paths.js";
+import { classifyPaths, readRouting } from "../runtime/routing.js";
 
 export interface TestArgs {
   kind: WorkflowKind;
@@ -77,9 +71,7 @@ export async function test(args: TestArgs): Promise<TestResult> {
 
     // docs/orchestration 步骤应使用 codecgc.manual 工具
     if (step.executor === "docs" || step.executor === "orchestration") {
-      throw new Error(
-        `步骤 ${step.id} 的 executor 是 ${step.executor}，应使用 codecgc.manual 工具手动标记完成`
-      );
+      throw new Error(`步骤 ${step.id} 的 executor 是 ${step.executor}，应使用 codecgc.manual 工具手动标记完成`);
     }
 
     validateStepPaths(step.paths);
@@ -90,13 +82,13 @@ export async function test(args: TestArgs): Promise<TestResult> {
     if (step.executor === "backend" && classified.has("frontend")) {
       const frontendPaths = classified.get("frontend") || [];
       throw new Error(
-        `后端测试步骤 ${step.id} 包含前端路径，拒绝执行: ${frontendPaths.slice(0, 3).join(", ")}${frontendPaths.length > 3 ? ` (and ${frontendPaths.length - 3} more)` : ""}`
+        `后端测试步骤 ${step.id} 包含前端路径，拒绝执行: ${frontendPaths.slice(0, 3).join(", ")}${frontendPaths.length > 3 ? ` (and ${frontendPaths.length - 3} more)` : ""}`,
       );
     }
     if (step.executor === "frontend" && classified.has("backend")) {
       const backendPaths = classified.get("backend") || [];
       throw new Error(
-        `前端测试步骤 ${step.id} 包含后端路径，拒绝执行: ${backendPaths.slice(0, 3).join(", ")}${backendPaths.length > 3 ? ` (and ${backendPaths.length - 3} more)` : ""}`
+        `前端测试步骤 ${step.id} 包含后端路径，拒绝执行: ${backendPaths.slice(0, 3).join(", ")}${backendPaths.length > 3 ? ` (and ${backendPaths.length - 3} more)` : ""}`,
       );
     }
 

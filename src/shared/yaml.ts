@@ -27,7 +27,7 @@ export async function writeYaml(filePath: string, data: unknown): Promise<void> 
 }
 
 /**
- * 解析 YAML 字符串
+ * 解析 YAML 字符串（安全 schema：只允许 JSON 兼容类型）
  */
 export function parseYaml<T = unknown>(content: string): T {
   return yaml.load(content, SAFE_LOAD_OPTIONS) as T;

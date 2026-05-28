@@ -19,7 +19,9 @@ function tryParseJson(line) {
     const parsed = JSON.parse(line.trim());
     if (typeof parsed === "object" && parsed !== null) return parsed;
     return null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function detectPhase(event) {
@@ -28,7 +30,8 @@ function detectPhase(event) {
   if (type === "turn.completed" || type === "result") return "completed";
   if (type === "tool_use" && event.tool) {
     const tool = (typeof event.tool === "string" ? event.tool : "").toLowerCase();
-    if (tool.includes("read") || tool.includes("grep") || tool.includes("glob") || tool.includes("search")) return "reading";
+    if (tool.includes("read") || tool.includes("grep") || tool.includes("glob") || tool.includes("search"))
+      return "reading";
     if (tool.includes("write") || tool.includes("edit") || tool.includes("create")) return "writing";
   }
   if (type === "message" && event.role === "assistant") return "thinking";
@@ -54,7 +57,10 @@ async function main() {
     windowsHide: true,
   });
 
-  writeFileSync(resultFile + ".spawned", "gemini_pid=" + proc.pid + " cmd=" + opts.cmd + " args_len=" + opts.args.length);
+  writeFileSync(
+    resultFile + ".spawned",
+    "gemini_pid=" + proc.pid + " cmd=" + opts.cmd + " args_len=" + opts.args.length,
+  );
 
   proc.on("error", (e) => {
     writeFileSync(resultFile + ".spawn-error", e.message);
@@ -71,7 +77,10 @@ async function main() {
 
   const timeout = setTimeout(() => {
     timedOut = true;
-    writeFileSync(resultFile + ".timeout", "timeout at " + new Date().toISOString() + " stderr=" + stderrBuffer.slice(0, 500));
+    writeFileSync(
+      resultFile + ".timeout",
+      "timeout at " + new Date().toISOString() + " stderr=" + stderrBuffer.slice(0, 500),
+    );
     try {
       if (process.platform === "win32") {
         require("child_process").execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
@@ -82,7 +91,7 @@ async function main() {
   }, opts.timeoutMs || 600000);
 
   // 心跳检测（每 30 秒检查一次，2 分钟无事件 = 可疑）
-  const HEARTBEAT_INTERVAL = 30_000;  // 检查间隔 30 秒
+  const HEARTBEAT_INTERVAL = 30_000; // 检查间隔 30 秒
   const HEARTBEAT_THRESHOLD = 120_000; // 2 分钟无事件 = 可疑
   const heartbeatCheck = setInterval(() => {
     const elapsed = Date.now() - lastEventTime;
@@ -97,7 +106,7 @@ async function main() {
   // 事件驱动读取 stdout（不阻塞事件循环）
   proc.stdout.on("data", (chunk) => {
     lastEventTime = Date.now(); // 更新心跳时间
-    heartbeatWarned = false;    // 重置警告标志
+    heartbeatWarned = false; // 重置警告标志
 
     buffer += chunk.toString();
     const lines = buffer.split("\n");
@@ -110,12 +119,15 @@ async function main() {
       // 写进度文件（供 runViaWorker 读取）
       const phase = detectPhase(event);
       try {
-        writeFileSync(resultFile + ".progress", JSON.stringify({
-          phase,
-          lastEventTime: Date.now(),
-          lastEventType: event.type || "unknown",
-          isAlive: true,
-        }));
+        writeFileSync(
+          resultFile + ".progress",
+          JSON.stringify({
+            phase,
+            lastEventTime: Date.now(),
+            lastEventType: event.type || "unknown",
+            isAlive: true,
+          }),
+        );
       } catch {}
 
       if (event.session_id && typeof event.session_id === "string") {
@@ -151,26 +163,32 @@ async function main() {
 
   await new Promise((resolve) => {
     proc.once("exit", resolve);
-    setTimeout(() => { try { proc.kill(); } catch {} resolve(); }, opts.timeoutMs + 5000);
+    setTimeout(() => {
+      try {
+        proc.kill();
+      } catch {}
+      resolve();
+    }, opts.timeoutMs + 5000);
   });
 
   clearTimeout(timeout);
   clearInterval(heartbeatCheck);
   if (stdinFd !== null) {
-    try { require("fs").closeSync(stdinFd); } catch {}
+    try {
+      require("fs").closeSync(stdinFd);
+    } catch {}
   }
 
   const result = {
-    success: timedOut ? false : (!!sessionId && !errorMessage),
+    success: timedOut ? false : !!sessionId && !errorMessage,
     sessionId,
     agentMessages,
-    error: timedOut ? `执行超时（${opts.timeoutMs}ms）` : (errorMessage || undefined),
+    error: timedOut ? `执行超时（${opts.timeoutMs}ms）` : errorMessage || undefined,
   };
 
   writeFileSync(resultFile, JSON.stringify(result));
 }
 
-main().catch(e => {
+main().catch((e) => {
   writeFileSync(resultFile, JSON.stringify({ success: false, sessionId: "", agentMessages: "", error: e.message }));
 });
-

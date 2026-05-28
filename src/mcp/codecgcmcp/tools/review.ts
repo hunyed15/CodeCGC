@@ -1,20 +1,20 @@
 import { readFile } from "fs/promises";
-import {
-  readWorkflow,
-  writeWorkflow,
-  resolveWorkflowDir,
-  listAudits,
-  findStep,
-  writeAudit,
-} from "../runtime/artifacts.js";
-import { resolveProjectRoot } from "../runtime/paths.js";
-import { readRouting, classifyPaths, hasMixedOwnership } from "../runtime/routing.js";
 import type { WorkflowKind } from "../../../shared/types.js";
 import {
-  findLatestExecAudit,
-  readFilesForReview,
+  findStep,
+  listAudits,
+  readWorkflow,
+  resolveWorkflowDir,
+  writeAudit,
+  writeWorkflow,
+} from "../runtime/artifacts.js";
+import { resolveProjectRoot } from "../runtime/paths.js";
+import { classifyPaths, hasMixedOwnership, readRouting } from "../runtime/routing.js";
+import {
   collectPreviousReviews,
+  findLatestExecAudit,
   generateRecommendation,
+  readFilesForReview,
 } from "./review-helpers.js";
 
 export type ReviewDecision = "approved" | "changes-requested" | "rejected" | "reopen";
@@ -174,106 +174,106 @@ export async function review(args: ReviewArgs): Promise<ReviewRequest | ReviewRe
       throw new Error(`步骤不存在: ${args.step_id}`);
     }
 
-  if (step.status !== "pending" && step.status !== "skipped") {
-    throw new Error(`步骤 ${args.step_id} 状态为 ${step.status}，只能审核 pending 或 skipped 状态的步骤`);
-  }
-  if (step.status === "skipped" && args.decision !== "reopen") {
-    throw new Error(`步骤 ${args.step_id} 状态为 skipped，只能使用 reopen 决策恢复`);
-  }
-  if (step.status === "pending" && args.decision === "reopen") {
-    throw new Error(`步骤 ${args.step_id} 状态为 pending，不需要 reopen`);
-  }
+    if (step.status !== "pending" && step.status !== "skipped") {
+      throw new Error(`步骤 ${args.step_id} 状态为 ${step.status}，只能审核 pending 或 skipped 状态的步骤`);
+    }
+    if (step.status === "skipped" && args.decision !== "reopen") {
+      throw new Error(`步骤 ${args.step_id} 状态为 skipped，只能使用 reopen 决策恢复`);
+    }
+    if (step.status === "pending" && args.decision === "reopen") {
+      throw new Error(`步骤 ${args.step_id} 状态为 pending，不需要 reopen`);
+    }
 
-  const auditFiles = await listAudits(workflowDir, args.step_id);
-  if (args.decision !== "reopen" && auditFiles.length === 0) {
-    throw new Error(`步骤 ${args.step_id} 没有 audit 记录，无法审核`);
-  }
+    const auditFiles = await listAudits(workflowDir, args.step_id);
+    if (args.decision !== "reopen" && auditFiles.length === 0) {
+      throw new Error(`步骤 ${args.step_id} 没有 audit 记录，无法审核`);
+    }
 
-  const policyChecks: string[] = [];
-  if (hasMixedOwnership(step.paths, routing)) {
-    policyChecks.push("⚠️ 步骤路径包含 mixed/shared/unknown 路径");
-  }
-  const classified = classifyPaths(step.paths, routing);
-  if (step.executor === "backend" && classified.has("frontend")) {
-    policyChecks.push("⚠️ 后端步骤包含前端路径，可能越界");
-  }
-  if (step.executor === "frontend" && classified.has("backend")) {
-    policyChecks.push("⚠️ 前端步骤包含后端路径，可能越界");
-  }
+    const policyChecks: string[] = [];
+    if (hasMixedOwnership(step.paths, routing)) {
+      policyChecks.push("⚠️ 步骤路径包含 mixed/shared/unknown 路径");
+    }
+    const classified = classifyPaths(step.paths, routing);
+    if (step.executor === "backend" && classified.has("frontend")) {
+      policyChecks.push("⚠️ 后端步骤包含前端路径，可能越界");
+    }
+    if (step.executor === "frontend" && classified.has("backend")) {
+      policyChecks.push("⚠️ 前端步骤包含后端路径，可能越界");
+    }
 
-  // prepare 模式
-  if (args.decision === undefined) {
-    return await preparePackage({
-      workflow,
-      step,
-      auditFiles,
-      workflowDir,
-      projectRoot,
-      policyChecks,
-      maxFileSizeKb: args.max_file_size_kb ?? 200,
-    });
-  }
+    // prepare 模式
+    if (args.decision === undefined) {
+      return await preparePackage({
+        workflow,
+        step,
+        auditFiles,
+        workflowDir,
+        projectRoot,
+        policyChecks,
+        maxFileSizeKb: args.max_file_size_kb ?? 200,
+      });
+    }
 
-  // decision 模式
-  if (args.decision !== "reopen" && auditFiles.length > 0) {
-    const latestExec = await findLatestExecAudit(auditFiles);
-    if (latestExec) {
-      const auditContent = JSON.parse(await readFile(latestExec, "utf-8"));
-      if (auditContent.result?.success !== true) {
-        policyChecks.push(`⚠️ 最新执行 audit 显示执行未成功: ${auditContent.result?.error ?? "未知错误"}`);
-      }
-      if (auditContent.kind !== "manual" && !auditContent.result?.sessionId) {
-        policyChecks.push("⚠️ 最新执行 audit 缺少 session_id，可能是 dry-run");
+    // decision 模式
+    if (args.decision !== "reopen" && auditFiles.length > 0) {
+      const latestExec = await findLatestExecAudit(auditFiles);
+      if (latestExec) {
+        const auditContent = JSON.parse(await readFile(latestExec, "utf-8"));
+        if (auditContent.result?.success !== true) {
+          policyChecks.push(`⚠️ 最新执行 audit 显示执行未成功: ${auditContent.result?.error ?? "未知错误"}`);
+        }
+        if (auditContent.kind !== "manual" && !auditContent.result?.sessionId) {
+          policyChecks.push("⚠️ 最新执行 audit 缺少 session_id，可能是 dry-run");
+        }
       }
     }
-  }
 
-  let nextAction = "";
-  switch (args.decision) {
-    case "approved":
-      step.status = "done";
-      await writeWorkflow(projectRoot, workflow);
-      nextAction = "本步骤通过审核，可继续下一步骤";
-      break;
-    case "changes-requested":
-      nextAction = workflow.kind === "feature"
-        ? "调用 codecgc.build 重新执行此步骤"
-        : "调用 codecgc.fix 重新执行此步骤";
-      break;
-    case "rejected":
-      step.status = "skipped";
-      await writeWorkflow(projectRoot, workflow);
-      nextAction = "步骤已驳回，请重新规划替代方案（可用 reopen 恢复）";
-      break;
-    case "reopen":
-      step.status = "pending";
-      await writeWorkflow(projectRoot, workflow);
-      nextAction = workflow.kind === "feature"
-        ? "步骤已恢复为 pending，调用 codecgc.build 重新执行"
-        : "步骤已恢复为 pending，调用 codecgc.fix 重新执行";
-      break;
-  }
+    let nextAction = "";
+    switch (args.decision) {
+      case "approved":
+        step.status = "done";
+        await writeWorkflow(projectRoot, workflow);
+        nextAction = "本步骤通过审核，可继续下一步骤";
+        break;
+      case "changes-requested":
+        nextAction =
+          workflow.kind === "feature" ? "调用 codecgc.build 重新执行此步骤" : "调用 codecgc.fix 重新执行此步骤";
+        break;
+      case "rejected":
+        step.status = "skipped";
+        await writeWorkflow(projectRoot, workflow);
+        nextAction = "步骤已驳回，请重新规划替代方案（可用 reopen 恢复）";
+        break;
+      case "reopen":
+        step.status = "pending";
+        await writeWorkflow(projectRoot, workflow);
+        nextAction =
+          workflow.kind === "feature"
+            ? "步骤已恢复为 pending，调用 codecgc.build 重新执行"
+            : "步骤已恢复为 pending，调用 codecgc.fix 重新执行";
+        break;
+    }
 
-  const issues = args.issues ?? [];
-  const issuesSummary = {
-    critical: issues.filter((i) => i.severity === "critical").length,
-    major: issues.filter((i) => i.severity === "major").length,
-    minor: issues.filter((i) => i.severity === "minor").length,
-    info: issues.filter((i) => i.severity === "info").length,
-  };
+    const issues = args.issues ?? [];
+    const issuesSummary = {
+      critical: issues.filter((i) => i.severity === "critical").length,
+      major: issues.filter((i) => i.severity === "major").length,
+      minor: issues.filter((i) => i.severity === "minor").length,
+      info: issues.filter((i) => i.severity === "info").length,
+    };
 
-  await writeAudit(workflowDir, args.step_id, {
-    step_id: args.step_id,
-    kind: "review",
-    decision: args.decision,
-    notes: args.notes,
-    timestamp: new Date().toISOString(),
-    policy_checks: policyChecks,
-    issues,
-    suggestions: args.suggestions ?? [],
-    acceptance_check: args.acceptance_check ?? [],
-    issues_summary: issuesSummary,
-  });
+    await writeAudit(workflowDir, args.step_id, {
+      step_id: args.step_id,
+      kind: "review",
+      decision: args.decision,
+      notes: args.notes,
+      timestamp: new Date().toISOString(),
+      policy_checks: policyChecks,
+      issues,
+      suggestions: args.suggestions ?? [],
+      acceptance_check: args.acceptance_check ?? [],
+      issues_summary: issuesSummary,
+    });
 
     return {
       mode: "decision",
@@ -342,9 +342,7 @@ async function preparePackage(opts: {
     };
   }
 
-  const filesToRead = executionInfo.changed_files.length > 0
-    ? executionInfo.changed_files
-    : step.paths;
+  const filesToRead = executionInfo.changed_files.length > 0 ? executionInfo.changed_files : step.paths;
 
   const fileContents = await readFilesForReview(projectRoot, filesToRead, maxFileSizeKb);
   const previousReviews = await collectPreviousReviews(auditFiles);
