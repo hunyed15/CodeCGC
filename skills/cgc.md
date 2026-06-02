@@ -1,6 +1,7 @@
 ---
 name: cgc
 description: CodeCGC 单入口 - 自然语言需求自动路由到合适的工作流
+allowed-tools: Bash, Read, Glob, Grep, LS
 ---
 
 CodeCGC 单入口命令。根据用户的自然语言需求自动决定流程。
@@ -10,6 +11,13 @@ CodeCGC 单入口命令。根据用户的自然语言需求自动决定流程。
 ## 必须执行
 
 不要只解释本命令，也不要要求用户再去终端执行。收到 `/cgc` 后必须根据需求类型实际调用对应的 MCP 工具；如果 MCP 工具不可用、没有返回内容，或当前环境无法直接调用 MCP，则立刻用 `cgc` CLI 回退。
+
+如果 MCP 工具没有出现在当前工具列表里，这只表示 MCP 对本轮不可直接调用，不表示可以停止执行。必须继续尝试 Claude Code 的本地工具：
+
+- 优先用 `Bash` 执行 `cgc ...` / `cgc-...` 回退命令。
+- 如果 `Bash` 不可用但 `Read` / `Glob` / `Grep` / `LS` 可用，必须直接读取仓库文件和 `.codecgc/**` 产物完成只读检阅。
+- 只有在实际尝试工具调用后发现 MCP、Bash、Read、Glob、Grep、LS 全部不可用时，才说明当前客户端没有提供执行工具。禁止在未尝试工具调用时声称“没有终端/文件读取工具”。
+- 禁止要求用户粘贴 `cgc status`、`tree`、`README.md` 等输出；这些是代理应自行读取的内容。
 
 判断逻辑：
 
@@ -47,7 +55,14 @@ cgc-history --limit 20
 cgc-doctor
 ```
 
-只有在 MCP 和 CLI 都失败时，才把真实错误信息告诉用户。禁止在没有真实返回的情况下要求用户自行执行命令并贴输出。
+如果 MCP 和 CLI 都失败，但文件读取工具可用，必须直接读取这些位置并手工梳理：
+
+- 项目结构：`LS` / `Glob` / `Bash(ls/tree/dir)` 读取根目录、`src/**`、`app/**`、`backend/**`、`frontend/**`
+- 文档：`README.md`、`docs/**`、`CHANGELOG.md`
+- CodeCGC 配置：`.codecgc/config/**`、`.mcp.json`、`.claude/CLAUDE.md`
+- 进度产物：`.codecgc/features/**`、`.codecgc/issues/**`、`.codecgc/execution/**`
+
+只有在 MCP、CLI 和文件读取工具都实际失败时，才把真实错误信息告诉用户。禁止在没有真实返回的情况下要求用户自行执行命令并贴输出。
 
 ## 模式感知
 

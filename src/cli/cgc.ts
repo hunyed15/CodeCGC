@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 
 const program = new Command();
 
-program.name("cgc").description("CodeCGC 多模型工作流编排 CLI").version("1.0.16");
+program.name("cgc").description("CodeCGC 多模型工作流编排 CLI").version("1.0.17");
 
 // ==================== 辅助函数 ====================
 

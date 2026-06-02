@@ -36,6 +36,8 @@ cgc-history $ARGUMENTS
 
 只有在 MCP 和 CLI 都失败时，才把真实错误信息告诉用户。禁止在未拿到真实返回时声称已经查询历史。
 
+如果 MCP 工具没有出现在当前工具列表里，不要停下来解释工具不可用；必须继续尝试 `Bash` 执行 CLI。只有实际调用 MCP/CLI 失败后才能报告失败，且禁止要求用户粘贴命令输出。
+
 查询模式：
 - 不传参数 → 列出所有 workflow
 - 传 kind+slug → 查看该 workflow 的所有 audits
