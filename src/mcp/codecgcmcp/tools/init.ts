@@ -17,6 +17,7 @@ const GLOBAL_ONLY_SKILLS = ["cgc-init", "cgc"];
 export interface InitArgs {
   cd?: string;
   force?: boolean;
+  refresh_skills?: boolean;
   mode?: "lightweight" | "full";
   backend?: "claude" | "codex";
   frontend?: "claude" | "gemini" | "opencode";
@@ -43,6 +44,7 @@ export async function init(args: InitArgs): Promise<InitResult> {
   try {
     const projectRoot = resolveProjectRoot(args.cd);
     const force = args.force ?? false;
+    const refreshSkills = args.refresh_skills ?? false;
 
     // 确定模式和执行器配置
     const mode = args.mode ?? "lightweight";
@@ -123,7 +125,7 @@ export async function init(args: InitArgs): Promise<InitResult> {
     }
 
     // 6. 释放项目级 skills 到 .claude/skills/<name>/SKILL.md
-    const skillsResult = await releaseProjectSkills(projectRoot, force);
+    const skillsResult = await releaseProjectSkills(projectRoot, force || refreshSkills);
     if (skillsResult.released.length > 0) {
       created.push(`.claude/skills/ (${skillsResult.released.length} skills)`);
     }

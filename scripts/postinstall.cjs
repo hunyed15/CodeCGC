@@ -40,7 +40,7 @@ const skillsTargetBase = path.join(os.homedir(), '.claude', 'skills');
 const LEGACY_SKILLS = [
   'cgc', 'cgc-init', 'cgc-build', 'cgc-doctor', 'cgc-entry',
   'cgc-explain', 'cgc-fix', 'cgc-history', 'cgc-plan', 'cgc-review',
-  'cgc-status', 'cgc-test', 'cgc-continue', 'cgc-audit', 'cgc-manual',
+  'cgc-status', 'cgc-test', 'cgc-route', 'cgc-continue', 'cgc-audit', 'cgc-manual',
 ];
 
 try {

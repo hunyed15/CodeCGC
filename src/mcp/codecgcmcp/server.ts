@@ -97,6 +97,7 @@ const TOOLS: Tool[] = [
       properties: {
         cd: { type: "string", description: "项目根目录" },
         force: { type: "boolean", description: "强制覆盖已存在的文件" },
+        refresh_skills: { type: "boolean", description: "仅刷新项目级 skills，不覆盖 workflow 配置" },
         mode: {
           type: "string",
           enum: ["lightweight", "full"],

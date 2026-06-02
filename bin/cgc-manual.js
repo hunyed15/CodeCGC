@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { runCgc } from "./cgc-proxy.js";
+
+runCgc(["manual", ...process.argv.slice(2)]);

@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 
 const program = new Command();
 
-program.name("cgc").description("CodeCGC 多模型工作流编排 CLI").version("0.7.0");
+program.name("cgc").description("CodeCGC 多模型工作流编排 CLI").version("1.0.16");
 
 // ==================== 辅助函数 ====================
 
@@ -46,7 +46,7 @@ async function callMcpTool(toolName: string, args: Record<string, unknown>): Pro
 
     let data: unknown;
     try {
-      data = JSON.parse(content.text);
+      data = parseJsonPayload(content.text);
     } catch {
       console.error("MCP 返回非 JSON 内容:", content.text.slice(0, 200));
       process.exit(1);
@@ -73,19 +73,40 @@ function parseTimeout(value: string): number {
   return n;
 }
 
+function parseJsonPayload(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const trimmed = text.trim();
+    for (let end = trimmed.length; end > 0; end--) {
+      const candidate = trimmed.slice(0, end).trimEnd();
+      if (!candidate.endsWith("}") && !candidate.endsWith("]")) continue;
+      try {
+        return JSON.parse(candidate);
+      } catch {}
+    }
+    throw new Error("No JSON payload found");
+  }
+}
+
+function detectWorkflowKind(description: string): "feature" | "issue" {
+  return /修复|错误|报错|故障|bug|fix|error|issue/i.test(description) ? "issue" : "feature";
+}
+
 // ==================== 命令定义 ====================
 
 program
-  .command("entry <description>")
+  .command("entry <description...>")
   .description("创建或恢复一个 workflow 入口")
   .option("-k, --kind <kind>", "workflow 类型 (feature/issue)")
   .option("-s, --slug <slug>", "自定义 slug")
   .option("--artifact-class <class>", "产物类型 (product/fixture)", "product")
   .option("--cd <dir>", "项目根目录", process.cwd())
-  .action(async (description, options) => {
+  .action(async (descriptionParts, options) => {
+    const description = descriptionParts.join(" ").trim();
     await callMcpTool("codecgc.entry", {
       description,
-      kind: options.kind,
+      kind: options.kind ?? detectWorkflowKind(description),
       slug: options.slug,
       artifact_class: options.artifactClass,
       cd: options.cd,
@@ -108,26 +129,28 @@ program
   .command("route <paths...>")
   .description("根据路径判断归属，推荐 executor")
   .option("--cd <dir>", "项目根目录", process.cwd())
+  .option("--executor-hint <hint>", "显式 executor 提示 (frontend/backend/docs/both)")
   .action(async (paths, options) => {
     await callMcpTool("codecgc.route", {
       paths,
       cd: options.cd,
+      executor_hint: options.executorHint,
     });
   });
 
 program
-  .command("history")
+  .command("history [kind] [slug] [step-id]")
   .description("查询历史 workflow 和 audit 记录")
   .option("-k, --kind <kind>", "workflow 类型 (feature/issue)")
   .option("-s, --slug <slug>", "workflow slug")
   .option("--step-id <id>", "step ID")
   .option("--limit <n>", "限制返回数量", parseInt)
   .option("--cd <dir>", "项目根目录", process.cwd())
-  .action(async (options) => {
+  .action(async (kind, slug, stepId, options) => {
     await callMcpTool("codecgc.history", {
-      kind: options.kind,
-      slug: options.slug,
-      step_id: options.stepId,
+      kind: options.kind ?? kind,
+      slug: options.slug ?? slug,
+      step_id: options.stepId ?? stepId,
       limit: options.limit,
       cd: options.cd,
     });
@@ -138,22 +161,30 @@ program
   .description("初始化项目（创建 .codecgc/ 目录和配置文件）")
   .option("--cd <dir>", "项目根目录", process.cwd())
   .option("--force", "强制覆盖已存在的文件")
+  .option("--refresh-skills", "刷新项目级 skills，不覆盖 workflow 配置")
+  .option("--mode <mode>", "工作模式 (lightweight/full)")
+  .option("--backend <provider>", "后端执行器 (claude/codex)")
+  .option("--frontend <provider>", "前端执行器 (claude/gemini/opencode)")
   .action(async (options) => {
     await callMcpTool("codecgc.init", {
       cd: options.cd,
       force: options.force,
+      refresh_skills: options.refreshSkills,
+      mode: options.mode,
+      backend: options.backend,
+      frontend: options.frontend,
     });
   });
 
 program
-  .command("status")
+  .command("status [filter]")
   .description("显示所有 workflow 状态摘要")
   .option("--cd <dir>", "项目根目录", process.cwd())
-  .option("--filter <filter>", "过滤条件 (active/closed/all)", "all")
-  .action(async (options) => {
+  .option("--filter <filter>", "过滤条件 (active/closed/all)")
+  .action(async (filter, options) => {
     await callMcpTool("codecgc.status", {
       cd: options.cd,
-      filter: options.filter,
+      filter: options.filter ?? filter ?? "active",
     });
   });
 
@@ -184,15 +215,15 @@ program
   });
 
 program
-  .command("audit")
+  .command("audit [check]")
   .description("工作流完整性审计")
   .option("--cd <dir>", "项目根目录", process.cwd())
-  .option("--check <type>", "检查类型 (completeness/stale/all)", "all")
+  .option("--check <type>", "检查类型 (completeness/stale/all)")
   .option("--stale-days <n>", "陈旧阈值（天）", "7")
-  .action(async (options) => {
+  .action(async (check, options) => {
     await callMcpTool("codecgc.audit", {
       cd: options.cd,
-      check: options.check,
+      check: options.check ?? check ?? "all",
       stale_days: parseInt(options.staleDays, 10),
     });
   });
@@ -240,15 +271,17 @@ program
   });
 
 program
-  .command("build <kind> <slug>")
+  .command("build <kind-or-slug> [slug]")
   .description("执行 feature workflow 的下一个 pending 步骤")
   .option("--step-id <id>", "指定步骤 ID")
   .option("--cd <dir>", "项目根目录", process.cwd())
   .option("--timeout <seconds>", "超时时间（秒）", "900")
-  .action(async (kind, slug, options) => {
+  .action(async (kindOrSlug, slug, options) => {
+    const kind = kindOrSlug === "feature" || kindOrSlug === "issue" ? kindOrSlug : "feature";
+    const workflowSlug = slug ?? kindOrSlug;
     await callMcpTool("codecgc.build", {
       kind,
-      slug,
+      slug: workflowSlug,
       step_id: options.stepId,
       cd: options.cd,
       timeout_seconds: parseTimeout(options.timeout),
@@ -256,15 +289,17 @@ program
   });
 
 program
-  .command("fix <kind> <slug>")
+  .command("fix <kind-or-slug> [slug]")
   .description("执行 issue workflow 的下一个 pending 步骤")
   .option("--step-id <id>", "指定步骤 ID")
   .option("--cd <dir>", "项目根目录", process.cwd())
   .option("--timeout <seconds>", "超时时间（秒）", "900")
-  .action(async (kind, slug, options) => {
+  .action(async (kindOrSlug, slug, options) => {
+    const kind = kindOrSlug === "feature" || kindOrSlug === "issue" ? kindOrSlug : "issue";
+    const workflowSlug = slug ?? kindOrSlug;
     await callMcpTool("codecgc.fix", {
       kind,
-      slug,
+      slug: workflowSlug,
       step_id: options.stepId,
       cd: options.cd,
       timeout_seconds: parseTimeout(options.timeout),
@@ -317,6 +352,22 @@ program
     }
 
     await callMcpTool("codecgc.review", args);
+  });
+
+program
+  .argument("[description...]", "自然语言需求，等价于 cgc entry <description>")
+  .action(async (descriptionParts: string[]) => {
+    const description = descriptionParts.join(" ").trim();
+    if (!description) {
+      program.help();
+      return;
+    }
+
+    await callMcpTool("codecgc.entry", {
+      description,
+      kind: detectWorkflowKind(description),
+      cd: process.cwd(),
+    });
   });
 
 program.parse();
